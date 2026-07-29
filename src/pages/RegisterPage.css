@@ -1,0 +1,104 @@
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 23px;
+}
+
+.name-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 23px;
+}
+
+.register-form input {
+  width: 100%;
+  min-width: 0;
+  height: 43px;
+  padding: 0 21px;
+
+  border: 2px solid transparent;
+  border-radius: 17px;
+  outline: none;
+
+  background: #272946;
+  color: #ffffff;
+
+  text-align: center;
+
+  font-size: 16px;
+  font-weight: 400;
+
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    background-color 200ms ease;
+}
+
+.register-form input::placeholder {
+  color: #777daf;
+  opacity: 1;
+}
+
+.register-form input:hover {
+  background: #2b2d4d;
+}
+
+.register-form input:focus {
+  border-color: rgba(65, 112, 202, 0.9);
+
+  box-shadow:
+    0 0 0 3px rgba(63, 102, 196, 0.1),
+    0 0 16px rgba(54, 83, 183, 0.17);
+}
+
+.create-account-button {
+  align-self: center;
+
+  min-width: 210px;
+  min-height: 43px;
+  padding: 8px 25px;
+
+  border: 1.5px solid rgba(255, 255, 255, 0.66);
+  border-radius: 17px;
+
+  background: transparent;
+  color: #ffffff;
+
+  font-size: 16px;
+  font-weight: 400;
+
+  cursor: pointer;
+
+  transition:
+    background-color 280ms ease,
+    color 280ms ease,
+    border-color 280ms ease,
+    box-shadow 320ms ease,
+    transform 220ms ease;
+}
+
+.create-account-button:hover,
+.create-account-button:focus-visible {
+  border-color: #ffffff;
+  outline: none;
+
+  background: #ffffff;
+  color: #05070b;
+
+  box-shadow:
+    0 0 10px rgba(86, 111, 255, 0.72),
+    0 0 25px rgba(67, 94, 255, 0.5),
+    0 0 42px rgba(54, 80, 234, 0.26);
+
+  transform: translateY(-2px);
+}
+
+.create-account-button:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 560px) {
+  .name-fields {
+    grid-template-columns: 1fr;
+  }
+}
