@@ -1,0 +1,91 @@
+.auth-switch {
+  position: relative;
+  flex: 0 0 auto;
+
+  width: 205px;
+  height: 43px;
+  margin: 30px auto 44px;
+
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+
+  border-radius: 24px;
+  background: #252747;
+  isolation: isolate;
+}
+
+.auth-switch-slider {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 0;
+
+  width: 50%;
+  height: 100%;
+
+  border-radius: 24px;
+  background: #9299dd;
+
+  box-shadow:
+    0 0 12px rgba(111, 123, 222, 0.18),
+    0 0 22px rgba(78, 95, 205, 0.12);
+
+  transform: translateX(0);
+
+  transition:
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 280ms ease;
+}
+
+.auth-switch.show-signin .auth-switch-slider {
+  transform: translateX(100%);
+}
+
+.auth-switch-button {
+  position: relative;
+  z-index: 1;
+
+  min-height: 43px;
+  padding: 7px 15px;
+
+  border: 0;
+  border-radius: 24px;
+
+  background: transparent;
+  color: #ffffff;
+
+  font-size: 16px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    color 240ms ease,
+    transform 180ms ease;
+}
+
+.auth-switch-button:hover {
+  transform: translateY(-1px);
+}
+
+.auth-switch-button.active {
+  color: #090b13;
+}
+
+.auth-switch-button:focus-visible {
+  outline: 2px solid #b4bcff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 560px) {
+  .auth-switch {
+    margin-bottom: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-switch-slider,
+  .auth-switch-button {
+    transition: none;
+  }
+}
