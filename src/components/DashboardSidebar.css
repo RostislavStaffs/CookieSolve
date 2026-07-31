@@ -1,0 +1,139 @@
+.dashboard-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 20;
+
+  width: 205px;
+  min-height: 100vh;
+  padding: 27px 20px;
+
+  background: #0d0d10;
+  border-right: 1px solid rgba(255, 255, 255, 0.025);
+}
+
+.dashboard-sidebar-logo {
+  padding: 0;
+  border: 0;
+
+  background: transparent;
+  color: #ffffff;
+
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.7px;
+
+  cursor: pointer;
+
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.dashboard-sidebar-logo:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.dashboard-sidebar-navigation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 22px;
+
+  margin-top: 62px;
+}
+
+.dashboard-sidebar-link {
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+
+  background: transparent;
+  color: #d5d5da;
+
+  text-align: left;
+
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.3;
+
+  cursor: pointer;
+
+  transition:
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.dashboard-sidebar-link:hover {
+  color: #ffffff;
+  transform: translateX(3px);
+}
+
+.dashboard-sidebar-link.active {
+  color: #4962ff;
+  font-weight: 600;
+}
+
+.dashboard-sidebar-link:focus-visible,
+.dashboard-sidebar-logo:focus-visible {
+  outline: 2px solid #7183ff;
+  outline-offset: 5px;
+  border-radius: 4px;
+}
+
+@media (max-width: 850px) {
+  .dashboard-sidebar {
+    position: relative;
+
+    width: 100%;
+    min-height: auto;
+    padding: 22px 5%;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .dashboard-sidebar-navigation {
+    margin-top: 0;
+
+    flex-direction: row;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .dashboard-sidebar-link {
+    width: auto;
+    font-size: 14px;
+  }
+
+  .dashboard-sidebar-link:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-sidebar-logo {
+    font-size: 18px;
+  }
+
+  .dashboard-sidebar-navigation {
+    gap: 12px;
+  }
+
+  .dashboard-sidebar-link {
+    font-size: 13px;
+  }
+
+  .dashboard-sidebar-link:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-sidebar-logo,
+  .dashboard-sidebar-link {
+    transition: none;
+  }
+}

@@ -1,0 +1,411 @@
+.add-rule-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background: rgba(3, 3, 6, 0.82);
+  backdrop-filter: blur(2px);
+
+  animation: addRuleBackdropReveal 200ms ease forwards;
+}
+
+.add-rule-modal {
+  width: min(100%, 520px);
+  padding: 28px 30px 26px;
+
+  border: 1px solid rgba(91, 107, 221, 0.16);
+  border-radius: 21px;
+
+  background: #17161c;
+  color: #ffffff;
+
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.48),
+    0 0 32px rgba(58, 76, 191, 0.08);
+
+  opacity: 0;
+  transform: translateY(14px) scale(0.985);
+
+  animation: addRuleModalReveal 300ms
+    cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.add-rule-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.add-rule-modal-header h2 {
+  margin: 0;
+
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+
+.add-rule-modal-header p {
+  max-width: 390px;
+  margin: 8px 0 0;
+
+  color: #96959e;
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.add-rule-modal-close {
+  position: relative;
+
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  padding: 0;
+  border: 0;
+
+  background: transparent;
+
+  cursor: pointer;
+
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.add-rule-modal-close span {
+  position: absolute;
+  top: 15px;
+  left: 2px;
+
+  width: 28px;
+  height: 2px;
+
+  border-radius: 2px;
+  background: #ffffff;
+}
+
+.add-rule-modal-close span:first-child {
+  transform: rotate(45deg);
+}
+
+.add-rule-modal-close span:last-child {
+  transform: rotate(-45deg);
+}
+
+.add-rule-modal-close:hover {
+  opacity: 0.72;
+  transform: rotate(4deg);
+}
+
+.add-rule-modal-close:focus-visible {
+  outline: 2px solid #98a5ff;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.add-rule-modal-form {
+  margin-top: 24px;
+}
+
+.rule-option-list {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rule-option-list legend,
+.custom-rule-field label {
+  margin-bottom: 10px;
+
+  color: #e8e7ec;
+
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.rule-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.rule-option-card {
+  position: relative;
+
+  min-height: 56px;
+  padding: 10px 13px;
+
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 12px;
+
+  background: #111016;
+
+  cursor: pointer;
+
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.rule-option-card:hover {
+  border-color: rgba(80, 101, 244, 0.38);
+  background: #15141b;
+  transform: translateY(-1px);
+}
+
+.rule-option-card.selected {
+  border-color: #5369f2;
+  background: rgba(64, 85, 232, 0.09);
+
+  box-shadow:
+    0 0 0 3px rgba(64, 85, 232, 0.06),
+    0 0 16px rgba(64, 85, 232, 0.08);
+}
+
+.rule-option-card input {
+  position: absolute;
+
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.rule-option-radio {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+
+  border: 2px solid #4e63eb;
+  border-radius: 50%;
+}
+
+.rule-option-radio::after {
+  content: "";
+
+  width: 8px;
+  height: 8px;
+  margin: 3px;
+
+  display: block;
+
+  border-radius: 50%;
+
+  background: #687cff;
+
+  opacity: 0;
+  transform: scale(0.5);
+
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.rule-option-card input:checked + .rule-option-radio::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.rule-option-card input:focus-visible + .rule-option-radio {
+  outline: 2px solid #98a5ff;
+  outline-offset: 3px;
+}
+
+.rule-option-content {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.rule-option-content strong {
+  color: #ecebf0;
+
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.rule-option-content small {
+  margin-top: 2px;
+
+  color: #7f7e87;
+
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.custom-rule-field {
+  margin-top: 21px;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.custom-rule-field input {
+  width: 100%;
+  height: 38px;
+  padding: 0 13px;
+
+  border: 1.5px dashed #4058ef;
+  border-radius: 13px;
+  outline: none;
+
+  background: #0d0c10;
+  color: #ffffff;
+
+  font-size: 13px;
+
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.custom-rule-field input::placeholder {
+  color: #606170;
+}
+
+.custom-rule-field input:focus {
+  border-style: solid;
+  border-color: #7184ff;
+
+  background: #111016;
+
+  box-shadow:
+    0 0 0 3px rgba(71, 94, 244, 0.09),
+    0 0 15px rgba(62, 85, 236, 0.14);
+}
+
+.add-rule-modal-actions {
+  margin-top: 24px;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.add-rule-modal-actions button {
+  min-height: 40px;
+  padding: 8px 18px;
+
+  border-radius: 12px;
+
+  font-size: 13px;
+  font-weight: 400;
+
+  cursor: pointer;
+
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.add-rule-cancel-button {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+
+  background: transparent;
+  color: #d0cfd5;
+}
+
+.add-rule-cancel-button:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.add-rule-confirm-button {
+  border: 0;
+
+  background: #4055e8;
+  color: #ffffff;
+}
+
+.add-rule-confirm-button:hover:not(:disabled) {
+  background: #4c62f4;
+
+  box-shadow:
+    0 0 11px rgba(72, 92, 245, 0.3),
+    0 0 22px rgba(62, 83, 232, 0.14);
+
+  transform: translateY(-2px);
+}
+
+.add-rule-confirm-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.add-rule-modal-actions button:focus-visible {
+  outline: 2px solid #98a5ff;
+  outline-offset: 3px;
+}
+
+@keyframes addRuleBackdropReveal {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes addRuleModalReveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 520px) {
+  .add-rule-modal-backdrop {
+    padding: 14px;
+  }
+
+  .add-rule-modal {
+    padding: 24px 20px;
+  }
+
+  .add-rule-modal-header h2 {
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .add-rule-modal-backdrop,
+  .add-rule-modal {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+
+  .add-rule-modal-close,
+  .rule-option-card,
+  .rule-option-radio::after,
+  .add-rule-modal-actions button {
+    transition: none;
+  }
+}

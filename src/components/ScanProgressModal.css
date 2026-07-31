@@ -1,0 +1,288 @@
+.scan-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background: rgba(4, 4, 7, 0.78);
+  backdrop-filter: blur(1px);
+
+  animation: scanBackdropReveal 220ms ease forwards;
+}
+
+.scan-progress-modal {
+  width: min(100%, 500px);
+  padding: 24px 32px 22px;
+
+  border-radius: 21px;
+
+  background: #17161c;
+  color: #ffffff;
+
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.42),
+    0 0 30px rgba(48, 66, 177, 0.07);
+
+  opacity: 0;
+  transform: translateY(14px) scale(0.985);
+
+  animation: scanModalReveal 320ms
+    cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.scan-progress-modal h2 {
+  margin: 0 0 18px;
+
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+
+.scan-target-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 18px;
+
+  margin-bottom: 26px;
+
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.scan-target-value {
+  min-height: 31px;
+  padding: 3px 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
+
+  border: 1.5px dashed #4058ef;
+  border-radius: 14px;
+
+  color: #4560ff;
+
+  font-size: 17px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-progress-section h3 {
+  margin: 0 0 17px;
+
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.scan-progress-list {
+  margin: 0;
+  padding: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+
+  list-style: none;
+}
+
+.scan-progress-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  color: #8d8c94;
+
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.35;
+
+  transition:
+    color 240ms ease,
+    opacity 240ms ease;
+}
+
+.scan-progress-item.complete,
+.scan-progress-item.active {
+  color: #eeeeF2;
+}
+
+.scan-step-status {
+  position: relative;
+
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 2px solid rgba(63, 85, 232, 0.65);
+  border-radius: 50%;
+}
+
+.scan-progress-item.complete .scan-step-status {
+  border-color: #4058ef;
+  background: #4058ef;
+
+  animation: scanStepComplete 280ms
+    cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scan-step-status svg {
+  width: 10px;
+  height: 10px;
+
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.scan-loading-ring {
+  position: absolute;
+  inset: -2px;
+
+  border: 2px solid rgba(65, 89, 242, 0.25);
+  border-top-color: #5168ff;
+  border-right-color: #5168ff;
+  border-radius: 50%;
+
+  animation: scanRingRotate 780ms linear infinite;
+}
+
+.cancel-scan-button {
+  min-width: 138px;
+  min-height: 40px;
+  margin-top: 32px;
+  padding: 8px 18px;
+
+  border: 0;
+  border-radius: 12px;
+
+  background: #4055e8;
+  color: #ffffff;
+
+  font-size: 16px;
+  font-weight: 400;
+
+  cursor: pointer;
+
+  transition:
+    background-color 200ms ease,
+    box-shadow 220ms ease,
+    transform 180ms ease;
+}
+
+.cancel-scan-button:hover {
+  background: #4c62f4;
+
+  box-shadow:
+    0 0 12px rgba(72, 92, 245, 0.34),
+    0 0 24px rgba(62, 83, 232, 0.17);
+
+  transform: translateY(-2px);
+}
+
+.cancel-scan-button:active {
+  transform: translateY(0);
+}
+
+.cancel-scan-button:focus-visible {
+  outline: 2px solid #98a5ff;
+  outline-offset: 4px;
+}
+
+@keyframes scanBackdropReveal {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scanModalReveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes scanRingRotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes scanStepComplete {
+  0% {
+    transform: scale(0.7);
+  }
+
+  65% {
+    transform: scale(1.18);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 560px) {
+  .scan-modal-backdrop {
+    padding: 18px;
+  }
+
+  .scan-progress-modal {
+    padding: 23px 21px;
+  }
+
+  .scan-progress-modal h2 {
+    font-size: 23px;
+  }
+
+  .scan-target-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .scan-progress-item {
+    font-size: 14px;
+  }
+
+  .cancel-scan-button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-modal-backdrop,
+  .scan-progress-modal,
+  .scan-loading-ring,
+  .scan-progress-item.complete .scan-step-status {
+    animation: none;
+  }
+
+  .scan-progress-modal {
+    opacity: 1;
+    transform: none;
+  }
+}
