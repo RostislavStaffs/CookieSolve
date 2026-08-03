@@ -1,28 +1,50 @@
 import "./BrowserStorageFindingsModal.css";
 
-const storageFindings = [
-  {
-    id: 1,
-    type: "localStorage",
-    key: "analytics_user",
-    timing: "After reject",
-    issue: "Tracking ID",
-    severity: "High",
-  },
-  {
-    id: 2,
-    type: "sessionStorage",
-    key: "banner_closed",
-    timing: "After reject",
-    issue: "Informational",
-    severity: "Info",
-  },
-];
+function formatTiming(phase) {
+  if (phase === "pre-consent") {
+    return "Before consent";
+  }
+
+  if (phase === "post-rejection") {
+    return "After rejection";
+  }
+
+  return phase || "Unknown";
+}
+
+function formatSeverity(severity) {
+  if (!severity) {
+    return "Unknown";
+  }
+
+  return (
+    severity.charAt(0).toUpperCase() +
+    severity.slice(1)
+  );
+}
 
 function BrowserStorageFindingsModal({
+  findings = [],
   onClose,
   onViewFinding,
 }) {
+  const storageFindings =
+    findings.filter(
+      (finding) =>
+        finding.category ===
+        "browser-storage",
+    );
+
+  const highCount =
+    storageFindings.filter(
+      (finding) =>
+        finding.severity === "high",
+    ).length;
+
+  const otherCount =
+    storageFindings.length -
+    highCount;
+
   return (
     <div
       className="storage-modal-backdrop"
@@ -34,7 +56,9 @@ function BrowserStorageFindingsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="storage-findings-title"
-        onMouseDown={(event) => event.stopPropagation()}
+        onMouseDown={(event) =>
+          event.stopPropagation()
+        }
       >
         <header className="storage-modal-header">
           <div>
@@ -43,8 +67,7 @@ function BrowserStorageFindingsModal({
             </h2>
 
             <p>
-              Local and session storage entries detected during the
-              consent tests.
+              Local and session storage entries detected during the consent tests.
             </p>
           </div>
 
@@ -63,62 +86,131 @@ function BrowserStorageFindingsModal({
           <table className="storage-findings-table">
             <thead>
               <tr>
-                <th scope="col">Type</th>
-                <th scope="col">Key</th>
-                <th scope="col">Timing</th>
-                <th scope="col">Issue</th>
-                <th scope="col">Severity</th>
-                <th scope="col">Action</th>
+                <th scope="col">
+                  Type
+                </th>
+
+                <th scope="col">
+                  Key
+                </th>
+
+                <th scope="col">
+                  Timing
+                </th>
+
+                <th scope="col">
+                  Issue
+                </th>
+
+                <th scope="col">
+                  Severity
+                </th>
+
+                <th scope="col">
+                  Action
+                </th>
               </tr>
             </thead>
 
             <tbody>
-              {storageFindings.map((finding) => (
-                <tr key={finding.id}>
-                  <td>
-                    <span className="storage-type-badge">
-                      {finding.type}
-                    </span>
-                  </td>
+              {storageFindings.length >
+              0 ? (
+                storageFindings.map(
+                  (finding, index) => {
+                    const evidence =
+                      finding.evidence ?? {};
 
-                  <td>
-                    <code>{finding.key}</code>
-                  </td>
+                    return (
+                      <tr
+                        key={
+                          finding._id ??
+                          `${finding.type}-${evidence.key}-${index}`
+                        }
+                      >
+                        <td>
+                          <span className="storage-type-badge">
+                            {evidence.storageType ??
+                              "Storage"}
+                          </span>
+                        </td>
 
-                  <td>{finding.timing}</td>
+                        <td>
+                          <code
+                            title={
+                              evidence.key
+                            }
+                          >
+                            {evidence.key ??
+                              "Unknown key"}
+                          </code>
+                        </td>
 
-                  <td>{finding.issue}</td>
+                        <td>
+                          {formatTiming(
+                            finding.phase,
+                          )}
+                        </td>
 
-                  <td>
-                    <span
-                      className={`storage-severity-badge ${finding.severity.toLowerCase()}`}
-                    >
-                      {finding.severity}
-                    </span>
-                  </td>
+                        <td>
+                          {finding.title}
+                        </td>
 
-                  <td>
-                    <button
-                      className="storage-view-button"
-                      type="button"
-                      onClick={() => onViewFinding?.(finding)}
-                    >
-                      View
-                    </button>
+                        <td>
+                          <span
+                            className={`storage-severity-badge ${
+                              finding.severity ===
+                              "high"
+                                ? "high"
+                                : "info"
+                            }`}
+                          >
+                            {formatSeverity(
+                              finding.severity,
+                            )}
+                          </span>
+                        </td>
+
+                        <td>
+                          <button
+                            className="storage-view-button"
+                            type="button"
+                            onClick={() =>
+                              onViewFinding?.(
+                                finding,
+                              )
+                            }
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  },
+                )
+              ) : (
+                <tr>
+                  <td colSpan="6">
+                    No browser-storage findings were detected.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
 
         <div className="storage-modal-footer">
           <span>
-            <strong>1</strong> potential tracking entry
+            <strong>
+              {highCount}
+            </strong>{" "}
+            high-severity entries
           </span>
 
           <span>
-            <strong>1</strong> informational entry
+            <strong>
+              {otherCount}
+            </strong>{" "}
+            medium or low-severity entries
           </span>
         </div>
       </section>

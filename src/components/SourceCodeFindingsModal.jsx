@@ -1,26 +1,42 @@
 import "./SourceCodeFindingsModal.css";
 
-const sourceCodeFindings = [
-  {
-    id: 1,
-    file: "src/App.jsx",
-    line: 12,
-    issue: "gtag called before consent",
-    severity: "High",
-  },
-  {
-    id: 2,
-    file: "src/analytics.js",
-    line: 5,
-    issue: "document.cookie write",
-    severity: "Medium",
-  },
-];
+function formatSeverity(severity) {
+  if (!severity) {
+    return "Unknown";
+  }
+
+  return (
+    severity.charAt(0).toUpperCase() +
+    severity.slice(1)
+  );
+}
 
 function SourceCodeFindingsModal({
+  scan,
+  findings = [],
   onClose,
   onViewFinding,
 }) {
+  const sourceCodeFindings =
+    findings.filter(
+      (finding) =>
+        finding.category ===
+        "source-code",
+    );
+
+  const sourceScanningSelected =
+    scan?.scanOptions?.sourceCode ===
+    true;
+
+  const affectedFiles = new Set(
+    sourceCodeFindings
+      .map(
+        (finding) =>
+          finding.evidence?.file,
+      )
+      .filter(Boolean),
+  ).size;
+
   return (
     <div
       className="source-modal-backdrop"
@@ -32,7 +48,9 @@ function SourceCodeFindingsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="source-findings-title"
-        onMouseDown={(event) => event.stopPropagation()}
+        onMouseDown={(event) =>
+          event.stopPropagation()
+        }
       >
         <header className="source-modal-header">
           <div>
@@ -41,8 +59,7 @@ function SourceCodeFindingsModal({
             </h2>
 
             <p>
-              Source locations where tracking behaviour may run without an
-              appropriate consent check.
+              Source locations where tracking behaviour may run without an appropriate consent check.
             </p>
           </div>
 
@@ -61,59 +78,119 @@ function SourceCodeFindingsModal({
           <table className="source-findings-table">
             <thead>
               <tr>
-                <th scope="col">File</th>
-                <th scope="col">Line</th>
-                <th scope="col">Issue</th>
-                <th scope="col">Severity</th>
-                <th scope="col">Action</th>
+                <th scope="col">
+                  File
+                </th>
+
+                <th scope="col">
+                  Line
+                </th>
+
+                <th scope="col">
+                  Issue
+                </th>
+
+                <th scope="col">
+                  Severity
+                </th>
+
+                <th scope="col">
+                  Action
+                </th>
               </tr>
             </thead>
 
             <tbody>
-              {sourceCodeFindings.map((finding) => (
-                <tr key={finding.id}>
-                  <td>
-                    <code>{finding.file}</code>
-                  </td>
+              {sourceCodeFindings.length >
+              0 ? (
+                sourceCodeFindings.map(
+                  (finding, index) => {
+                    const evidence =
+                      finding.evidence ?? {};
 
-                  <td>
-                    <span className="source-line-number">
-                      {finding.line}
-                    </span>
-                  </td>
+                    return (
+                      <tr
+                        key={
+                          finding._id ??
+                          `${finding.type}-${index}`
+                        }
+                      >
+                        <td>
+                          <code>
+                            {evidence.file ??
+                              "Unknown file"}
+                          </code>
+                        </td>
 
-                  <td>{finding.issue}</td>
+                        <td>
+                          <span className="source-line-number">
+                            {evidence.line ??
+                              "—"}
+                          </span>
+                        </td>
 
-                  <td>
-                    <span
-                      className={`source-severity-badge ${finding.severity.toLowerCase()}`}
-                    >
-                      {finding.severity}
-                    </span>
-                  </td>
+                        <td>
+                          {finding.title}
+                        </td>
 
-                  <td>
-                    <button
-                      className="source-view-button"
-                      type="button"
-                      onClick={() => onViewFinding?.(finding)}
-                    >
-                      View
-                    </button>
+                        <td>
+                          <span
+                            className={`source-severity-badge ${
+                              finding.severity ===
+                              "high"
+                                ? "high"
+                                : "medium"
+                            }`}
+                          >
+                            {formatSeverity(
+                              finding.severity,
+                            )}
+                          </span>
+                        </td>
+
+                        <td>
+                          <button
+                            className="source-view-button"
+                            type="button"
+                            onClick={() =>
+                              onViewFinding?.(
+                                finding,
+                              )
+                            }
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  },
+                )
+              ) : (
+                <tr>
+                  <td colSpan="5">
+                    {sourceScanningSelected
+                      ? "Source-code analysis has been selected, but the static analyser has not been implemented yet."
+                      : "Source-code analysis was not enabled for this scan."}
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
 
         <div className="source-modal-footer">
           <span>
-            <strong>2</strong> source-code findings
+            <strong>
+              {sourceCodeFindings.length}
+            </strong>{" "}
+            source-code findings
           </span>
 
           <span>
-            <strong>2</strong> files affected
+            <strong>
+              {affectedFiles}
+            </strong>{" "}
+            files affected
           </span>
         </div>
       </section>

@@ -1,33 +1,43 @@
 import "./CookieFindingsModal.css";
 
-const cookieFindings = [
-  {
-    id: 1,
-    name: "_ga",
-    domain: "localhost",
-    timing: "Before reject",
-    severity: "High",
-    action: "View",
-  },
-  {
-    id: 2,
-    name: "_fbp",
-    domain: "localhost",
-    timing: "After reject",
-    severity: "High",
-    action: "View",
-  },
-  {
-    id: 3,
-    name: "session_id",
-    domain: "localhost",
-    timing: "Before reject",
-    severity: "Allowed",
-    action: null,
-  },
-];
+function formatTiming(phase) {
+  if (phase === "pre-consent") {
+    return "Before consent";
+  }
 
-function CookieFindingsModal({ onClose, onViewFinding }) {
+  if (phase === "post-rejection") {
+    return "After rejection";
+  }
+
+  return phase || "Unknown";
+}
+
+function formatSeverity(severity) {
+  if (!severity) {
+    return "Unknown";
+  }
+
+  return (
+    severity.charAt(0).toUpperCase() +
+    severity.slice(1)
+  );
+}
+
+function CookieFindingsModal({
+  scan,
+  findings = [],
+  onClose,
+  onViewFinding,
+}) {
+  const cookieFindings = findings.filter(
+    (finding) =>
+      finding.category === "cookie",
+  );
+
+  const allowlistedCount =
+    scan?.necessaryCookieAllowlist?.length ??
+    0;
+
   return (
     <div
       className="cookie-modal-backdrop"
@@ -39,15 +49,18 @@ function CookieFindingsModal({ onClose, onViewFinding }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="cookie-findings-title"
-        onMouseDown={(event) => event.stopPropagation()}
+        onMouseDown={(event) =>
+          event.stopPropagation()
+        }
       >
         <header className="cookie-modal-header">
           <div>
-            <h2 id="cookie-findings-title">Cookie Findings</h2>
+            <h2 id="cookie-findings-title">
+              Cookie Findings
+            </h2>
 
             <p>
-              Cookies detected before consent or after the user rejected
-              tracking.
+              Cookies detected before consent or after the user rejected tracking.
             </p>
           </div>
 
@@ -66,59 +79,117 @@ function CookieFindingsModal({ onClose, onViewFinding }) {
           <table className="cookie-findings-table">
             <thead>
               <tr>
-                <th scope="col">Cookie Name</th>
-                <th scope="col">Domain</th>
-                <th scope="col">Timing</th>
-                <th scope="col">Severity</th>
-                <th scope="col">Action</th>
+                <th scope="col">
+                  Cookie Name
+                </th>
+
+                <th scope="col">
+                  Domain
+                </th>
+
+                <th scope="col">
+                  Timing
+                </th>
+
+                <th scope="col">
+                  Severity
+                </th>
+
+                <th scope="col">
+                  Action
+                </th>
               </tr>
             </thead>
 
             <tbody>
-              {cookieFindings.map((finding) => (
-                <tr key={finding.id}>
-                  <td>
-                    <code>{finding.name}</code>
-                  </td>
+              {cookieFindings.length >
+              0 ? (
+                cookieFindings.map(
+                  (finding, index) => {
+                    const evidence =
+                      finding.evidence ?? {};
 
-                  <td>{finding.domain}</td>
-
-                  <td>{finding.timing}</td>
-
-                  <td>
-                    <span
-                      className={`cookie-severity-badge ${finding.severity.toLowerCase()}`}
-                    >
-                      {finding.severity}
-                    </span>
-                  </td>
-
-                  <td>
-                    {finding.action ? (
-                      <button
-                        className="cookie-view-button"
-                        type="button"
-                        onClick={() => onViewFinding?.(finding)}
+                    return (
+                      <tr
+                        key={
+                          finding._id ??
+                          `${finding.type}-${evidence.name}-${index}`
+                        }
                       >
-                        View
-                      </button>
-                    ) : (
-                      <span className="cookie-no-action">—</span>
-                    )}
+                        <td>
+                          <code>
+                            {evidence.name ??
+                              "Unknown cookie"}
+                          </code>
+                        </td>
+
+                        <td>
+                          {evidence.domain ??
+                            "Unknown"}
+                        </td>
+
+                        <td>
+                          {formatTiming(
+                            finding.phase,
+                          )}
+                        </td>
+
+                        <td>
+                          <span
+                            className={`cookie-severity-badge ${
+                              finding.severity ===
+                              "high"
+                                ? "high"
+                                : "allowed"
+                            }`}
+                          >
+                            {formatSeverity(
+                              finding.severity,
+                            )}
+                          </span>
+                        </td>
+
+                        <td>
+                          <button
+                            className="cookie-view-button"
+                            type="button"
+                            onClick={() =>
+                              onViewFinding?.(
+                                finding,
+                              )
+                            }
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  },
+                )
+              ) : (
+                <tr>
+                  <td colSpan="5">
+                    No cookie findings were detected.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
 
         <div className="cookie-modal-footer">
           <span>
-            <strong>2</strong> potential issues
+            <strong>
+              {cookieFindings.length}
+            </strong>{" "}
+            potential issues
           </span>
 
           <span>
-            <strong>1</strong> allowlisted cookie
+            <strong>
+              {allowlistedCount}
+            </strong>{" "}
+            allowlisted cookies
           </span>
         </div>
       </section>

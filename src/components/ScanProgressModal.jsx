@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
 import { getScan } from "../services/scanApi";
 import "./ScanProgressModal.css";
 
@@ -7,43 +13,67 @@ const scanSteps = [
     key: "launch",
     label: "Launching clean browser session",
     backendSteps: [
-      "Preparing scan",
+      "Waiting to start",
+      "Starting runtime scan",
       "Launching browser",
     ],
   },
   {
     key: "open",
     label: "Opening target website",
-    backendSteps: ["Loading target website"],
+    backendSteps: [
+      "Loading target website",
+    ],
   },
   {
-    key: "pre-consent",
+    key: "pre-consent-wait",
+    label: "Waiting for pre-consent activity",
+    backendSteps: [
+      "Waiting for pre-consent activity",
+    ],
+  },
+  {
+    key: "pre-consent-capture",
     label: "Capturing pre-consent behaviour",
-    backendSteps: ["Capturing pre-consent behaviour"],
+    backendSteps: [
+      "Capturing pre-consent evidence",
+    ],
   },
   {
     key: "reject",
     label: "Clicking Reject All",
-    backendSteps: ["Applying reject action"],
+    backendSteps: [
+      "Locating rejection control",
+      "Rejecting consent",
+    ],
   },
   {
-    key: "wait",
+    key: "post-rejection-wait",
     label: "Waiting for post-rejection activity",
     backendSteps: [
       "Waiting for post-rejection activity",
     ],
   },
   {
-    key: "post-rejection",
+    key: "post-rejection-capture",
     label: "Capturing post-rejection behaviour",
     backendSteps: [
-      "Capturing post-rejection behaviour",
+      "Capturing post-rejection evidence",
+    ],
+  },
+  {
+    key: "analysis",
+    label: "Analysing captured evidence",
+    backendSteps: [
+      "Analysing captured evidence",
     ],
   },
   {
     key: "complete",
     label: "Saving scan results",
-    backendSteps: ["Scan completed"],
+    backendSteps: [
+      "Scan completed",
+    ],
   },
 ];
 
@@ -56,7 +86,9 @@ function findCurrentStepIndex(currentStep, status) {
     step.backendSteps.includes(currentStep),
   );
 
-  return matchingIndex >= 0 ? matchingIndex : 0;
+  return matchingIndex >= 0
+    ? matchingIndex
+    : 0;
 }
 
 function ScanProgressModal({
@@ -66,8 +98,11 @@ function ScanProgressModal({
   onComplete,
 }) {
   const [scan, setScan] = useState(null);
-  const [errorMessage, setErrorMessage] = useState("");
-  const intervalRef = useRef(null);
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
+  const pollingTimeoutRef = useRef(null);
+  const completionTimeoutRef = useRef(null);
   const completionHandledRef = useRef(false);
 
   const currentStepIndex = useMemo(
@@ -76,25 +111,37 @@ function ScanProgressModal({
         scan?.currentStep,
         scan?.status,
       ),
-    [scan],
+    [
+      scan?.currentStep,
+      scan?.status,
+    ],
   );
 
   useEffect(() => {
     let componentMounted = true;
 
-    const stopPolling = () => {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
+    function stopPolling() {
+      if (pollingTimeoutRef.current) {
+        window.clearTimeout(
+          pollingTimeoutRef.current,
+        );
 
-    const loadScan = async () => {
+        pollingTimeoutRef.current = null;
+      }
+    }
+
+    async function loadScan() {
       try {
         const data = await getScan(scanId);
 
         if (!componentMounted) {
           return;
+        }
+
+        if (!data?.scan) {
+          throw new Error(
+            "The server did not return the scan record.",
+          );
         }
 
         setScan(data.scan);
@@ -106,10 +153,15 @@ function ScanProgressModal({
           if (!completionHandledRef.current) {
             completionHandledRef.current = true;
 
-            window.setTimeout(() => {
-              onComplete(scanId);
-            }, 700);
+            completionTimeoutRef.current =
+              window.setTimeout(() => {
+                if (componentMounted) {
+                  onComplete(scanId);
+                }
+              }, 700);
           }
+
+          return;
         }
 
         if (data.scan.status === "failed") {
@@ -119,7 +171,15 @@ function ScanProgressModal({
             data.scan.errorMessage ||
               "The scan could not be completed.",
           );
+
+          return;
         }
+
+        pollingTimeoutRef.current =
+          window.setTimeout(
+            loadScan,
+            1000,
+          );
       } catch (error) {
         stopPolling();
 
@@ -130,20 +190,47 @@ function ScanProgressModal({
           );
         }
       }
-    };
+    }
+
+    if (!scanId) {
+      setErrorMessage(
+        "No scan ID was provided.",
+      );
+
+      return undefined;
+    }
 
     loadScan();
 
-    intervalRef.current = window.setInterval(
-      loadScan,
-      1000,
-    );
-
     return () => {
       componentMounted = false;
+
       stopPolling();
+
+      if (completionTimeoutRef.current) {
+        window.clearTimeout(
+          completionTimeoutRef.current,
+        );
+
+        completionTimeoutRef.current = null;
+      }
     };
-  }, [scanId, onComplete]);
+  }, [
+    scanId,
+    onComplete,
+  ]);
+
+  function handleClose() {
+    if (pollingTimeoutRef.current) {
+      window.clearTimeout(
+        pollingTimeoutRef.current,
+      );
+
+      pollingTimeoutRef.current = null;
+    }
+
+    onCancel();
+  }
 
   return (
     <div
@@ -178,14 +265,24 @@ function ScanProgressModal({
                 index < currentStepIndex;
 
               const isActive =
-                scan?.status === "running" &&
+                ["pending", "running"].includes(
+                  scan?.status,
+                ) &&
                 index === currentStepIndex;
 
               return (
                 <li
-                  className={`scan-progress-item ${
-                    isComplete ? "complete" : ""
-                  } ${isActive ? "active" : ""}`}
+                  className={[
+                    "scan-progress-item",
+                    isComplete
+                      ? "complete"
+                      : "",
+                    isActive
+                      ? "active"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   key={step.key}
                 >
                   <span
@@ -193,7 +290,10 @@ function ScanProgressModal({
                     aria-hidden="true"
                   >
                     {isComplete && (
-                      <svg viewBox="0 0 16 16">
+                      <svg
+                        viewBox="0 0 16 16"
+                        focusable="false"
+                      >
                         <path d="m3 8.3 3 3L13 4.9" />
                       </svg>
                     )}
@@ -203,30 +303,64 @@ function ScanProgressModal({
                     )}
                   </span>
 
-                  <span>{step.label}</span>
+                  <span>
+                    {step.label}
+                  </span>
                 </li>
               );
             })}
           </ol>
         </div>
 
-        {scan?.status === "running" && (
-          <p className="scan-current-step" aria-live="polite">
-            {scan.currentStep}
+        {!scan && !errorMessage && (
+          <p
+            className="scan-current-step"
+            aria-live="polite"
+          >
+            Retrieving scan progress...
+          </p>
+        )}
+
+        {scan &&
+          ["pending", "running"].includes(
+            scan.status,
+          ) && (
+            <p
+              className="scan-current-step"
+              aria-live="polite"
+            >
+              {scan.currentStep}
+            </p>
+          )}
+
+        {scan?.status === "completed" && (
+          <p
+            className="scan-current-step"
+            aria-live="polite"
+          >
+            Scan completed. Opening results...
           </p>
         )}
 
         {errorMessage && (
-          <div className="scan-progress-error" role="alert">
-            <strong>Scan failed</strong>
-            <span>{errorMessage}</span>
+          <div
+            className="scan-progress-error"
+            role="alert"
+          >
+            <strong>
+              Scan progress unavailable
+            </strong>
+
+            <span>
+              {errorMessage}
+            </span>
           </div>
         )}
 
         <button
           className="cancel-scan-button"
           type="button"
-          onClick={onCancel}
+          onClick={handleClose}
         >
           {scan?.status === "failed"
             ? "Close"
