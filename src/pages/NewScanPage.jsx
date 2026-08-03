@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout";
 import ScanProgressModal from "../components/ScanProgressModal";
+import { startScan } from "../services/scanApi";
 import "./NewScanPage.css";
 
 const necessaryCookieOptions = [
@@ -31,6 +32,12 @@ const necessaryCookieOptions = [
   },
 ];
 
+const defaultScanSettings = {
+  browser: "chromium",
+  waitTime: 3000,
+  sourceFolder: "./src",
+};
+
 function NewScanPage() {
   const navigate = useNavigate();
   const allowlistRef = useRef(null);
@@ -39,7 +46,36 @@ function NewScanPage() {
     "http://localhost:3000",
   );
 
+  const [rejectSelector, setRejectSelector] = useState(
+    "#reject-all",
+  );
+
+  const [sourceFolder, setSourceFolder] = useState(
+    defaultScanSettings.sourceFolder,
+  );
+
+  const [browser, setBrowser] = useState(
+    defaultScanSettings.browser,
+  );
+
+  const [waitTime, setWaitTime] = useState(
+    defaultScanSettings.waitTime,
+  );
+
+  const [consentAction, setConsentAction] = useState("reject");
+
+  const [scanOptions, setScanOptions] = useState({
+    checkCookies: true,
+    checkNetworkRequests: true,
+    checkStorage: true,
+    scanSourceCode: true,
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScanRunning, setIsScanRunning] = useState(false);
+  const [activeScanId, setActiveScanId] = useState(null);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const [isAllowlistOpen, setIsAllowlistOpen] = useState(false);
   const [allowlistSearch, setAllowlistSearch] = useState("");
 
@@ -47,6 +83,34 @@ function NewScanPage() {
     "session_id",
     "csrf_token",
   ]);
+
+  useEffect(() => {
+    const savedSettings = window.localStorage.getItem(
+      "cookiesolve-settings",
+    );
+
+    if (!savedSettings) {
+      return;
+    }
+
+    try {
+      const parsedSettings = JSON.parse(savedSettings);
+
+      if (parsedSettings.browser) {
+        setBrowser(parsedSettings.browser);
+      }
+
+      if (Number.isFinite(Number(parsedSettings.waitTime))) {
+        setWaitTime(Number(parsedSettings.waitTime));
+      }
+
+      if (parsedSettings.sourceFolder) {
+        setSourceFolder(parsedSettings.sourceFolder);
+      }
+    } catch {
+      // Invalid settings are ignored and defaults are used.
+    }
+  }, []);
 
   useEffect(() => {
     const closeDropdown = (event) => {
@@ -130,22 +194,79 @@ function NewScanPage() {
     }
   };
 
-  const handleRunScan = () => {
-    setIsAllowlistOpen(false);
-    setIsScanRunning(true);
+  const updateScanOption = (event) => {
+    const { name, checked } = event.target;
+
+    setScanOptions((currentOptions) => ({
+      ...currentOptions,
+      [name]: checked,
+    }));
   };
 
-  const handleScanComplete = useCallback(() => {
+  const handleRunScan = async (event) => {
+    event.preventDefault();
+
+    if (!targetUrl.trim()) {
+      setErrorMessage("Enter the website URL you want to scan.");
+      return;
+    }
+
+    if (consentAction === "reject" && !rejectSelector.trim()) {
+      setErrorMessage(
+        "Enter the CSS selector for the Reject All button.",
+      );
+      return;
+    }
+
+    setErrorMessage("");
+    setIsSubmitting(true);
+
+    try {
+      const data = await startScan({
+        targetUrl: targetUrl.trim(),
+
+        // The first runtime version currently performs rejection testing.
+        rejectSelector: rejectSelector.trim(),
+
+        browser,
+        waitTime: Number(waitTime),
+
+        consentAction,
+        sourceFolder: sourceFolder.trim(),
+        necessaryCookies: selectedCookies,
+        scanOptions,
+      });
+
+      setActiveScanId(data.scan.id);
+      setIsScanRunning(true);
+    } catch (error) {
+      setErrorMessage(
+        error.message || "Unable to start the scan.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleScanComplete = (completedScanId) => {
     setIsScanRunning(false);
-    navigate("/scan-results");
-  }, [navigate]);
+
+    navigate(`/scan-results?scan=${completedScanId}`);
+  };
+
+  const handleCloseProgress = () => {
+    setIsScanRunning(false);
+  };
 
   return (
     <DashboardLayout activePage="New Scan" title="New Scan">
       <section className="new-scan-page">
         <h1>Setup Scan</h1>
 
-        <form className="scan-setup-card">
+        <form
+          className="scan-setup-card"
+          onSubmit={handleRunScan}
+        >
           <div className="scan-field">
             <label htmlFor="target-website">
               Target Website
@@ -157,9 +278,11 @@ function NewScanPage() {
               type="url"
               value={targetUrl}
               placeholder="http://localhost:3000"
-              onChange={(event) =>
-                setTargetUrl(event.target.value)
-              }
+              required
+              onChange={(event) => {
+                setTargetUrl(event.target.value);
+                setErrorMessage("");
+              }}
             />
           </div>
 
@@ -171,6 +294,10 @@ function NewScanPage() {
                 type="radio"
                 name="consentAction"
                 value="accept"
+                checked={consentAction === "accept"}
+                onChange={(event) =>
+                  setConsentAction(event.target.value)
+                }
               />
 
               <span
@@ -186,7 +313,10 @@ function NewScanPage() {
                 type="radio"
                 name="consentAction"
                 value="reject"
-                defaultChecked
+                checked={consentAction === "reject"}
+                onChange={(event) =>
+                  setConsentAction(event.target.value)
+                }
               />
 
               <span
@@ -199,6 +329,29 @@ function NewScanPage() {
           </fieldset>
 
           <div className="scan-field">
+            <label htmlFor="reject-selector">
+              Reject Button Selector
+            </label>
+
+            <input
+              id="reject-selector"
+              name="rejectSelector"
+              type="text"
+              value={rejectSelector}
+              placeholder="#reject-all"
+              onChange={(event) => {
+                setRejectSelector(event.target.value);
+                setErrorMessage("");
+              }}
+            />
+
+            <small className="scan-field-help">
+              Enter the CSS selector used to identify the website’s
+              Reject All button.
+            </small>
+          </div>
+
+          <div className="scan-field">
             <label htmlFor="source-folder">
               Source Code Folder
             </label>
@@ -207,8 +360,11 @@ function NewScanPage() {
               id="source-folder"
               name="sourceFolder"
               type="text"
-              defaultValue="./src"
+              value={sourceFolder}
               placeholder="./src"
+              onChange={(event) =>
+                setSourceFolder(event.target.value)
+              }
             />
           </div>
 
@@ -362,7 +518,7 @@ function NewScanPage() {
                         </span>
 
                         <span>
-                          Add
+                          Add{" "}
                           <strong>
                             “{allowlistSearch.trim()}”
                           </strong>
@@ -394,7 +550,8 @@ function NewScanPage() {
               <input
                 type="checkbox"
                 name="checkCookies"
-                defaultChecked
+                checked={scanOptions.checkCookies}
+                onChange={updateScanOption}
               />
 
               <span
@@ -409,7 +566,8 @@ function NewScanPage() {
               <input
                 type="checkbox"
                 name="checkNetworkRequests"
-                defaultChecked
+                checked={scanOptions.checkNetworkRequests}
+                onChange={updateScanOption}
               />
 
               <span
@@ -424,7 +582,8 @@ function NewScanPage() {
               <input
                 type="checkbox"
                 name="checkStorage"
-                defaultChecked
+                checked={scanOptions.checkStorage}
+                onChange={updateScanOption}
               />
 
               <span
@@ -441,7 +600,8 @@ function NewScanPage() {
               <input
                 type="checkbox"
                 name="scanSourceCode"
-                defaultChecked
+                checked={scanOptions.scanSourceCode}
+                onChange={updateScanOption}
               />
 
               <span
@@ -453,10 +613,17 @@ function NewScanPage() {
             </label>
           </fieldset>
 
+          {errorMessage && (
+            <p className="scan-form-error" role="alert">
+              {errorMessage}
+            </p>
+          )}
+
           <div className="scan-form-actions">
             <button
               className="scan-action-button"
               type="button"
+              disabled={isSubmitting}
               onClick={() => navigate("/dashboard")}
             >
               Cancel
@@ -464,19 +631,20 @@ function NewScanPage() {
 
             <button
               className="scan-action-button"
-              type="button"
-              onClick={handleRunScan}
+              type="submit"
+              disabled={isSubmitting}
             >
-              Run Scan
+              {isSubmitting ? "Starting Scan..." : "Run Scan"}
             </button>
           </div>
         </form>
       </section>
 
-      {isScanRunning && (
+      {isScanRunning && activeScanId && (
         <ScanProgressModal
+          scanId={activeScanId}
           targetUrl={targetUrl}
-          onCancel={() => setIsScanRunning(false)}
+          onCancel={handleCloseProgress}
           onComplete={handleScanComplete}
         />
       )}

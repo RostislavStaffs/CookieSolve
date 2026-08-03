@@ -102,3 +102,29 @@
     grid-template-columns: 1fr;
   }
 }
+.auth-form-message {
+  margin: -6px 0 0;
+  padding: 9px 12px;
+
+  border-radius: 10px;
+
+  text-align: center;
+
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.auth-form-message.error {
+  border: 1px solid rgba(239, 67, 84, 0.25);
+
+  background: rgba(218, 45, 63, 0.1);
+  color: #ff8e99;
+}
+
+.create-account-button:disabled,
+.login-submit-button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+  transform: none;
+  box-shadow: none;
+}
