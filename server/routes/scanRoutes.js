@@ -1,9 +1,11 @@
 import express from "express";
+
 import {
   createScan,
   getScan,
   getScans,
 } from "../controllers/scanController.js";
+
 import requireAuth from "../middleware/requireAuth.js";
 
 const scanRouter = express.Router();
