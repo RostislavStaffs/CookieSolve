@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+
 import Scan from "../models/Scan.js";
 
 import {
@@ -29,7 +31,9 @@ function parseAllowlist(value) {
   if (typeof value === "string") {
     return value
       .split(",")
-      .map((item) => item.trim())
+      .map((item) =>
+        item.trim(),
+      )
       .filter(Boolean);
   }
 
@@ -60,7 +64,10 @@ function validateTargetUrl(targetUrl) {
     const parsedUrl =
       new URL(targetUrl);
 
-    return ["http:", "https:"].includes(
+    return [
+      "http:",
+      "https:",
+    ].includes(
       parsedUrl.protocol,
     );
   } catch {
@@ -114,6 +121,10 @@ async function executeScan(scanId) {
     const scan =
       await Scan.findById(scanId);
 
+    /*
+     * The scan may have been deleted before
+     * asynchronous processing started.
+     */
     if (!scan) {
       return;
     }
@@ -128,11 +139,17 @@ async function executeScan(scanId) {
 
     const runtimeResult =
       await runRuntimeScan({
-        targetUrl: scan.targetUrl,
+        targetUrl:
+          scan.targetUrl,
+
         rejectSelector:
           scan.rejectSelector,
-        browser: scan.browser,
-        waitTime: scan.waitTime,
+
+        browser:
+          scan.browser,
+
+        waitTime:
+          scan.waitTime,
 
         onStepChange: async (
           currentStep,
@@ -143,6 +160,20 @@ async function executeScan(scanId) {
           );
         },
       });
+
+    /*
+     * A scan cannot normally be deleted while
+     * running, but this check keeps the async
+     * workflow safe if the record disappears.
+     */
+    const scanStillExists =
+      await Scan.exists({
+        _id: scan._id,
+      });
+
+    if (!scanStillExists) {
+      return;
+    }
 
     await updateScanStep(
       scan._id,
@@ -174,9 +205,8 @@ async function executeScan(scanId) {
       analysis.summary;
 
     /*
-     * Temporary compatibility summary.
-     * We will remove this after updating
-     * the frontend results page.
+     * Kept temporarily for compatibility
+     * with older stored scans and UI code.
      */
     scan.summary =
       createLegacySummary({
@@ -208,10 +238,12 @@ async function executeScan(scanId) {
       {
         status: "failed",
         currentStep: "Scan failed",
+
         errorMessage:
           error instanceof Error
             ? error.message
             : "The runtime scan failed.",
+
         completedAt: new Date(),
       },
     );
@@ -224,13 +256,17 @@ export async function createScan(
 ) {
   try {
     const userId =
-      getAuthenticatedUserId(request);
+      getAuthenticatedUserId(
+        request,
+      );
 
     if (!userId) {
-      return response.status(401).json({
-        message:
-          "Authentication is required.",
-      });
+      return response
+        .status(401)
+        .json({
+          message:
+            "Authentication is required.",
+        });
     }
 
     const {
@@ -244,22 +280,29 @@ export async function createScan(
 
     if (
       !targetUrl ||
-      !validateTargetUrl(targetUrl)
+      !validateTargetUrl(
+        targetUrl,
+      )
     ) {
-      return response.status(400).json({
-        message:
-          "Enter a valid HTTP or HTTPS target URL.",
-      });
+      return response
+        .status(400)
+        .json({
+          message:
+            "Enter a valid HTTP or HTTPS target URL.",
+        });
     }
 
     if (
       !rejectSelector ||
-      typeof rejectSelector !== "string"
+      typeof rejectSelector !==
+        "string"
     ) {
-      return response.status(400).json({
-        message:
-          "A reject-button CSS selector is required.",
-      });
+      return response
+        .status(400)
+        .json({
+          message:
+            "A reject-button CSS selector is required.",
+        });
     }
 
     const numericWaitTime =
@@ -272,10 +315,12 @@ export async function createScan(
       numericWaitTime < 0 ||
       numericWaitTime > 30000
     ) {
-      return response.status(400).json({
-        message:
-          "Wait time must be between 0 and 30000 milliseconds.",
-      });
+      return response
+        .status(400)
+        .json({
+          message:
+            "Wait time must be between 0 and 30000 milliseconds.",
+        });
     }
 
     const supportedBrowsers = [
@@ -285,12 +330,16 @@ export async function createScan(
     ];
 
     if (
-      !supportedBrowsers.includes(browser)
+      !supportedBrowsers.includes(
+        browser,
+      )
     ) {
-      return response.status(400).json({
-        message:
-          "The selected browser is not supported.",
-      });
+      return response
+        .status(400)
+        .json({
+          message:
+            "The selected browser is not supported.",
+        });
     }
 
     const necessaryCookieAllowlist =
@@ -299,65 +348,88 @@ export async function createScan(
           .necessaryCookieAllowlist,
       );
 
-    const scan = await Scan.create({
-      user: userId,
-      targetUrl: targetUrl.trim(),
-      rejectSelector:
-        rejectSelector.trim(),
-      browser,
-      waitTime: numericWaitTime,
-      necessaryCookieAllowlist,
-      sourceCodeFolder:
-        String(sourceCodeFolder).trim(),
+    const scan =
+      await Scan.create({
+        user: userId,
 
-      scanOptions: {
-        cookies: parseBoolean(
-          scanOptions.cookies,
-          true,
-        ),
+        targetUrl:
+          targetUrl.trim(),
 
-        networkRequests: parseBoolean(
-          scanOptions.networkRequests,
-          true,
-        ),
+        rejectSelector:
+          rejectSelector.trim(),
 
-        browserStorage: parseBoolean(
-          scanOptions.browserStorage,
-          true,
-        ),
+        browser,
 
-        sourceCode: parseBoolean(
-          scanOptions.sourceCode,
-          false,
-        ),
-      },
+        waitTime:
+          numericWaitTime,
 
-      status: "pending",
-      currentStep:
-        "Waiting to start",
-    });
+        necessaryCookieAllowlist,
+
+        sourceCodeFolder:
+          String(
+            sourceCodeFolder,
+          ).trim(),
+
+        scanOptions: {
+          cookies:
+            parseBoolean(
+              scanOptions.cookies,
+              true,
+            ),
+
+          networkRequests:
+            parseBoolean(
+              scanOptions.networkRequests,
+              true,
+            ),
+
+          browserStorage:
+            parseBoolean(
+              scanOptions.browserStorage,
+              true,
+            ),
+
+          sourceCode:
+            parseBoolean(
+              scanOptions.sourceCode,
+              false,
+            ),
+        },
+
+        status: "pending",
+
+        currentStep:
+          "Waiting to start",
+      });
 
     /*
      * Start asynchronously so the frontend
-     * receives the scan ID immediately and
-     * can poll for progress.
+     * can receive the scan ID immediately.
      */
-    void executeScan(scan._id);
+    void executeScan(
+      scan._id,
+    );
 
-    return response.status(202).json({
-      message: "Scan started.",
-      scan,
-    });
+    return response
+      .status(202)
+      .json({
+        message:
+          "Scan started.",
+
+        scan,
+      });
   } catch (error) {
     console.error(
       "Unable to create scan:",
       error,
     );
 
-    return response.status(500).json({
-      message:
-        "The scan could not be started.",
-    });
+    return response
+      .status(500)
+      .json({
+        message:
+          "The scan could not be started.",
+      });
   }
 }
 
@@ -367,34 +439,58 @@ export async function getScan(
 ) {
   try {
     const userId =
-      getAuthenticatedUserId(request);
+      getAuthenticatedUserId(
+        request,
+      );
 
-    const { scanId } = request.params;
+    const { scanId } =
+      request.params;
 
-    const scan = await Scan.findOne({
-      _id: scanId,
-      user: userId,
-    }).lean();
-
-    if (!scan) {
-      return response.status(404).json({
-        message: "Scan not found.",
-      });
+    if (
+      !mongoose.isValidObjectId(
+        scanId,
+      )
+    ) {
+      return response
+        .status(400)
+        .json({
+          message:
+            "The scan ID is invalid.",
+        });
     }
 
-    return response.status(200).json({
-      scan,
-    });
+    const scan =
+      await Scan.findOne({
+        _id: scanId,
+        user: userId,
+      }).lean();
+
+    if (!scan) {
+      return response
+        .status(404)
+        .json({
+          message:
+            "Scan not found.",
+        });
+    }
+
+    return response
+      .status(200)
+      .json({
+        scan,
+      });
   } catch (error) {
     console.error(
       "Unable to retrieve scan:",
       error,
     );
 
-    return response.status(500).json({
-      message:
-        "The scan could not be retrieved.",
-    });
+    return response
+      .status(500)
+      .json({
+        message:
+          "The scan could not be retrieved.",
+      });
   }
 }
 
@@ -404,28 +500,126 @@ export async function getScans(
 ) {
   try {
     const userId =
-      getAuthenticatedUserId(request);
+      getAuthenticatedUserId(
+        request,
+      );
 
-    const scans = await Scan.find({
-      user: userId,
-    })
-      .sort({
-        createdAt: -1,
+    const scans =
+      await Scan.find({
+        user: userId,
       })
-      .lean();
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
 
-    return response.status(200).json({
-      scans,
-    });
+    return response
+      .status(200)
+      .json({
+        scans,
+      });
   } catch (error) {
     console.error(
       "Unable to retrieve scans:",
       error,
     );
 
-    return response.status(500).json({
-      message:
-        "The scans could not be retrieved.",
+    return response
+      .status(500)
+      .json({
+        message:
+          "The scans could not be retrieved.",
+      });
+  }
+}
+
+export async function deleteScan(
+  request,
+  response,
+) {
+  try {
+    const userId =
+      getAuthenticatedUserId(
+        request,
+      );
+
+    if (!userId) {
+      return response
+        .status(401)
+        .json({
+          message:
+            "Authentication is required.",
+        });
+    }
+
+    const { scanId } =
+      request.params;
+
+    if (
+      !mongoose.isValidObjectId(
+        scanId,
+      )
+    ) {
+      return response
+        .status(400)
+        .json({
+          message:
+            "The scan ID is invalid.",
+        });
+    }
+
+    const scan =
+      await Scan.findOne({
+        _id: scanId,
+        user: userId,
+      });
+
+    if (!scan) {
+      return response
+        .status(404)
+        .json({
+          message:
+            "Scan not found.",
+        });
+    }
+
+    if (
+      scan.status === "pending" ||
+      scan.status === "running"
+    ) {
+      return response
+        .status(409)
+        .json({
+          message:
+            "A scan cannot be deleted while it is still running.",
+        });
+    }
+
+    await Scan.deleteOne({
+      _id: scan._id,
+      user: userId,
     });
+
+    return response
+      .status(200)
+      .json({
+        message:
+          "Scan deleted successfully.",
+
+        scanId:
+          String(scan._id),
+      });
+  } catch (error) {
+    console.error(
+      "Unable to delete scan:",
+      error,
+    );
+
+    return response
+      .status(500)
+      .json({
+        message:
+          "The scan could not be deleted.",
+      });
   }
 }
