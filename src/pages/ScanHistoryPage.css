@@ -539,3 +539,149 @@
     transition: none;
   }
 }
+.scan-history-table-wrapper {
+  width: min(100%, 980px);
+}
+
+.scan-history-loading-state,
+.scan-history-error-state {
+  min-height: 280px;
+  margin-top: 45px;
+  padding: 35px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+
+  text-align: center;
+}
+
+.scan-history-loading-state p,
+.scan-history-error-state p {
+  margin: 0;
+
+  color: #85848d;
+
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.scan-history-error-state h2 {
+  margin: 0;
+
+  color: #ffffff;
+
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.scan-history-error-state button {
+  min-width: 120px;
+  min-height: 36px;
+  padding: 7px 18px;
+
+  border: 0;
+  border-radius: 11px;
+
+  background: #4055e8;
+  color: #ffffff;
+
+  font-size: 13px;
+
+  cursor: pointer;
+
+  transition:
+    background-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.scan-history-error-state button:hover {
+  background: #4c62f4;
+
+  box-shadow:
+    0 0 12px rgba(72, 92, 245, 0.25);
+
+  transform: translateY(-1px);
+}
+
+.scan-history-error-state button:focus-visible {
+  outline: 2px solid #98a5ff;
+  outline-offset: 3px;
+}
+
+.scan-history-browser {
+  display: inline-flex;
+  align-items: center;
+
+  padding: 4px 9px;
+
+  border: 1px solid rgba(116, 130, 255, 0.2);
+  border-radius: 20px;
+
+  background: rgba(78, 92, 196, 0.1);
+  color: #aab4ff;
+
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.scan-history-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  white-space: nowrap;
+}
+
+.scan-history-run-again-button {
+  padding: 3px 0;
+  border: 0;
+
+  background: transparent;
+  color: #9aa7ff;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.scan-history-run-again-button:hover {
+  color: #c0c7ff;
+  transform: translateX(2px);
+}
+
+.scan-history-run-again-button:focus-visible {
+  outline: 2px solid #98a5ff;
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+
+.scan-history-status.running {
+  border: 1px solid rgba(82, 112, 255, 0.28);
+
+  background: rgba(70, 91, 220, 0.12);
+  color: #9aa8ff;
+}
+
+@media (max-width: 760px) {
+  .scan-history-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-history-run-again-button,
+  .scan-history-error-state button {
+    transition: none;
+  }
+}

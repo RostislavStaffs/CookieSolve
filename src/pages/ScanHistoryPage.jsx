@@ -1,69 +1,304 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  useNavigate,
+} from "react-router-dom";
+
 import DashboardLayout from "../components/DashboardLayout";
+import { getScans } from "../services/scanApi";
+
 import "./ScanHistoryPage.css";
 
-const previousScans = [
-  {
-    id: 1,
-    date: "8 Jul 26",
-    targetUrl: "localhost:3000",
-    status: "Failed",
-    issues: 12,
-  },
-  {
-    id: 2,
-    date: "9 Jul 26",
-    targetUrl: "localhost:5173",
-    status: "Passed",
-    issues: 5,
-  },
-  {
-    id: 3,
-    date: "11 Jul 26",
-    targetUrl: "staging.cookiesolve.dev",
-    status: "Warning",
-    issues: 2,
-  },
-  {
-    id: 4,
-    date: "14 Jul 26",
-    targetUrl: "localhost:4173",
-    status: "Passed",
-    issues: 0,
-  },
+const statusOptions = [
+  "All statuses",
+  "Passed",
+  "Warning",
+  "Failed",
+  "Running",
 ];
+
+function formatScanDate(dateValue) {
+  if (!dateValue) {
+    return "Unknown date";
+  }
+
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function getScanIssueCount(scan) {
+  if (
+    Number.isFinite(
+      Number(scan?.findingsSummary?.total),
+    )
+  ) {
+    return Number(
+      scan.findingsSummary.total,
+    );
+  }
+
+  if (
+    Number.isFinite(
+      Number(scan?.summary?.issuesDetected),
+    )
+  ) {
+    return Number(
+      scan.summary.issuesDetected,
+    );
+  }
+
+  if (Array.isArray(scan?.findings)) {
+    return scan.findings.length;
+  }
+
+  return 0;
+}
+
+function getScanStatus(scan) {
+  if (scan?.status === "failed") {
+    return "Failed";
+  }
+
+  if (
+    scan?.status === "pending" ||
+    scan?.status === "running"
+  ) {
+    return "Running";
+  }
+
+  const highCount =
+    Number(
+      scan?.findingsSummary?.high,
+    ) || 0;
+
+  const mediumCount =
+    Number(
+      scan?.findingsSummary?.medium,
+    ) || 0;
+
+  const lowCount =
+    Number(
+      scan?.findingsSummary?.low,
+    ) || 0;
+
+  const totalIssues =
+    getScanIssueCount(scan);
+
+  if (
+    highCount > 0 ||
+    mediumCount > 0 ||
+    lowCount > 0 ||
+    totalIssues > 0
+  ) {
+    return "Warning";
+  }
+
+  return "Passed";
+}
+
+function getStatusClassName(status) {
+  return status
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+}
+
+function getTargetDisplayValue(targetUrl) {
+  if (!targetUrl) {
+    return "Unknown target";
+  }
+
+  try {
+    const parsedUrl = new URL(targetUrl);
+
+    return `${parsedUrl.hostname}${
+      parsedUrl.port
+        ? `:${parsedUrl.port}`
+        : ""
+    }`;
+  } catch {
+    return targetUrl;
+  }
+}
 
 function ScanHistoryPage() {
   const navigate = useNavigate();
 
-  const [searchValue, setSearchValue] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All statuses");
+  const [scans, setScans] = useState([]);
+  const [searchValue, setSearchValue] =
+    useState("");
+
+  const [statusFilter, setStatusFilter] =
+    useState("All statuses");
+
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [loadError, setLoadError] =
+    useState("");
+
+  const loadScans = useCallback(
+    async () => {
+      try {
+        setIsLoading(true);
+        setLoadError("");
+
+        const data = await getScans();
+
+        if (!Array.isArray(data?.scans)) {
+          throw new Error(
+            "The server did not return a valid scan list.",
+          );
+        }
+
+        setScans(data.scans);
+      } catch (error) {
+        console.error(
+          "Unable to load scan history:",
+          error,
+        );
+
+        setLoadError(
+          error.message ||
+            "Unable to load scan history.",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    loadScans();
+  }, [loadScans]);
 
   const filteredScans = useMemo(() => {
-    const normalisedSearch = searchValue.trim().toLowerCase();
+    const normalisedSearch =
+      searchValue
+        .trim()
+        .toLowerCase();
 
-    return previousScans.filter((scan) => {
+    return scans.filter((scan) => {
+      const status =
+        getScanStatus(scan);
+
+      const formattedDate =
+        formatScanDate(
+          scan.createdAt,
+        );
+
+      const searchableValues = [
+        scan.targetUrl,
+        getTargetDisplayValue(
+          scan.targetUrl,
+        ),
+        formattedDate,
+        scan.browser,
+        status,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
       const matchesSearch =
         normalisedSearch.length === 0 ||
-        scan.targetUrl.toLowerCase().includes(normalisedSearch) ||
-        scan.date.toLowerCase().includes(normalisedSearch);
+        searchableValues.includes(
+          normalisedSearch,
+        );
 
       const matchesStatus =
-        statusFilter === "All statuses" ||
-        scan.status === statusFilter;
+        statusFilter ===
+          "All statuses" ||
+        status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      return (
+        matchesSearch &&
+        matchesStatus
+      );
     });
-  }, [searchValue, statusFilter]);
+  }, [
+    scans,
+    searchValue,
+    statusFilter,
+  ]);
+
+  function handleViewScan(scanId) {
+    navigate(
+      `/scan-results?scan=${scanId}`,
+    );
+  }
+
+  function handleRunAgain(scan) {
+    navigate("/new-scan", {
+      state: {
+        targetUrl:
+          scan.targetUrl ?? "",
+
+        rejectSelector:
+          scan.rejectSelector ??
+          "#reject-all",
+
+        browser:
+          scan.browser ??
+          "chromium",
+
+        waitTime:
+          scan.waitTime ??
+          3000,
+
+        sourceFolder:
+          scan.sourceCodeFolder ??
+          "./src",
+
+        necessaryCookieAllowlist:
+          scan.necessaryCookieAllowlist ??
+          [],
+
+        scanOptions:
+          scan.scanOptions ?? {
+            cookies: true,
+            networkRequests: true,
+            browserStorage: true,
+            sourceCode: false,
+          },
+      },
+    });
+  }
+
+  const showEmptyState =
+    !isLoading &&
+    !loadError &&
+    filteredScans.length === 0;
 
   return (
-    <DashboardLayout activePage="Scan History" title="Scan History">
+    <DashboardLayout
+      activePage="Scan History"
+      title="Scan History"
+    >
       <section className="scan-history-page">
         <header className="scan-history-heading">
           <h1>Scan History</h1>
 
-          <p>Review and manage previous scans.</p>
+          <p>
+            Review and manage previous scans.
+          </p>
         </header>
 
         <section className="scan-history-panel">
@@ -87,7 +322,9 @@ function ScanHistoryPage() {
                   value={searchValue}
                   placeholder="Search target URL or date"
                   onChange={(event) =>
-                    setSearchValue(event.target.value)
+                    setSearchValue(
+                      event.target.value,
+                    )
                   }
                 />
 
@@ -96,7 +333,9 @@ function ScanHistoryPage() {
                     className="clear-history-search"
                     type="button"
                     aria-label="Clear search"
-                    onClick={() => setSearchValue("")}
+                    onClick={() =>
+                      setSearchValue("")
+                    }
                   >
                     ×
                   </button>
@@ -114,13 +353,21 @@ function ScanHistoryPage() {
                   id="scan-history-filter"
                   value={statusFilter}
                   onChange={(event) =>
-                    setStatusFilter(event.target.value)
+                    setStatusFilter(
+                      event.target.value,
+                    )
                   }
                 >
-                  <option>All statuses</option>
-                  <option>Passed</option>
-                  <option>Failed</option>
-                  <option>Warning</option>
+                  {statusOptions.map(
+                    (status) => (
+                      <option
+                        key={status}
+                        value={status}
+                      >
+                        {status}
+                      </option>
+                    ),
+                  )}
                 </select>
 
                 <span
@@ -131,87 +378,202 @@ function ScanHistoryPage() {
             </div>
           </div>
 
-          <div className="scan-history-table-wrapper">
-            <table className="scan-history-table">
-              <thead>
-                <tr>
-                  <th scope="col">Date</th>
-                  <th scope="col">Target URL</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Issues</th>
-                  <th scope="col">Action</th>
-                </tr>
-              </thead>
+          {isLoading && (
+            <div className="scan-history-loading-state">
+              <span className="scan-loading-ring" />
 
-              <tbody>
-                {filteredScans.map((scan) => (
-                  <tr key={scan.id}>
-                    <td>{scan.date}</td>
+              <p>
+                Loading scan history...
+              </p>
+            </div>
+          )}
 
-                    <td>
-                      <code>{scan.targetUrl}</code>
-                    </td>
+          {loadError && (
+            <div
+              className="scan-history-error-state"
+              role="alert"
+            >
+              <h2>
+                Scan history unavailable
+              </h2>
 
-                    <td>
-                      <span
-                        className={`scan-history-status ${scan.status.toLowerCase()}`}
-                      >
-                        {scan.status}
-                      </span>
-                    </td>
+              <p>{loadError}</p>
 
-                    <td>
-                      <span className="scan-history-issue-count">
-                        {scan.issues}
-                      </span>
-                    </td>
+              <button
+                type="button"
+                onClick={loadScans}
+              >
+                Try again
+              </button>
+            </div>
+          )}
 
-                    <td>
-                      <button
-                        className="scan-history-view-button"
-                        type="button"
-                        onClick={() =>
-                          navigate(`/scan-results?scan=${scan.id}`)
-                        }
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {!isLoading &&
+            !loadError && (
+              <div className="scan-history-table-wrapper">
+                <table className="scan-history-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">
+                        Date
+                      </th>
 
-            {filteredScans.length === 0 && (
-              <div className="scan-history-empty-state">
-                <div
-                  className="scan-history-empty-icon"
-                  aria-hidden="true"
-                >
-                  <svg viewBox="0 0 24 24">
-                    <path d="M4 5.5h16M7 3v5M17 3v5M5 9h14v11H5z" />
-                  </svg>
-                </div>
+                      <th scope="col">
+                        Target URL
+                      </th>
 
-                <h2>No scans found</h2>
+                      <th scope="col">
+                        Status
+                      </th>
 
-                <p>
-                  Try changing the search term or status filter.
-                </p>
+                      <th scope="col">
+                        Issues
+                      </th>
+
+                      <th scope="col">
+                        Browser
+                      </th>
+
+                      <th scope="col">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredScans.map(
+                      (scan) => {
+                        const status =
+                          getScanStatus(
+                            scan,
+                          );
+
+                        const issueCount =
+                          getScanIssueCount(
+                            scan,
+                          );
+
+                        return (
+                          <tr
+                            key={
+                              scan._id
+                            }
+                          >
+                            <td>
+                              {formatScanDate(
+                                scan.createdAt,
+                              )}
+                            </td>
+
+                            <td>
+                              <code
+                                title={
+                                  scan.targetUrl
+                                }
+                              >
+                                {getTargetDisplayValue(
+                                  scan.targetUrl,
+                                )}
+                              </code>
+                            </td>
+
+                            <td>
+                              <span
+                                className={`scan-history-status ${getStatusClassName(
+                                  status,
+                                )}`}
+                              >
+                                {status}
+                              </span>
+                            </td>
+
+                            <td>
+                              <span className="scan-history-issue-count">
+                                {
+                                  issueCount
+                                }
+                              </span>
+                            </td>
+
+                            <td>
+                              <span className="scan-history-browser">
+                                {scan.browser ??
+                                  "Unknown"}
+                              </span>
+                            </td>
+
+                            <td>
+                              <div className="scan-history-actions">
+                                <button
+                                  className="scan-history-view-button"
+                                  type="button"
+                                  onClick={() =>
+                                    handleViewScan(
+                                      scan._id,
+                                    )
+                                  }
+                                >
+                                  View
+                                </button>
+
+                                <button
+                                  className="scan-history-run-again-button"
+                                  type="button"
+                                  onClick={() =>
+                                    handleRunAgain(
+                                      scan,
+                                    )
+                                  }
+                                >
+                                  Run again
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      },
+                    )}
+                  </tbody>
+                </table>
+
+                {showEmptyState && (
+                  <div className="scan-history-empty-state">
+                    <div
+                      className="scan-history-empty-icon"
+                      aria-hidden="true"
+                    >
+                      <svg viewBox="0 0 24 24">
+                        <path d="M4 5.5h16M7 3v5M17 3v5M5 9h14v11H5z" />
+                      </svg>
+                    </div>
+
+                    <h2>
+                      No scans found
+                    </h2>
+
+                    <p>
+                      {scans.length === 0
+                        ? "Run your first scan to see it here."
+                        : "Try changing the search term or status filter."}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
-          </div>
 
           <footer className="scan-history-footer">
             <span>
-              Showing {filteredScans.length} of{" "}
-              {previousScans.length} scans
+              Showing{" "}
+              {filteredScans.length} of{" "}
+              {scans.length} scans
             </span>
 
             <button
               className="scan-history-new-scan-button"
               type="button"
-              onClick={() => navigate("/new-scan")}
+              onClick={() =>
+                navigate("/new-scan")
+              }
             >
               New Scan
             </button>
