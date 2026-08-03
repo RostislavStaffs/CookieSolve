@@ -1,34 +1,48 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import { useNavigate } from "react-router-dom";
+
 import DashboardLayout from "../components/DashboardLayout";
 import ScanProgressModal from "../components/ScanProgressModal";
 import { startScan } from "../services/scanApi";
+
 import "./NewScanPage.css";
 
 const necessaryCookieOptions = [
   {
     name: "session_id",
-    description: "Maintains the active user session",
+    description:
+      "Maintains the active user session",
   },
   {
     name: "csrf_token",
-    description: "Protects forms against CSRF attacks",
+    description:
+      "Protects forms against CSRF attacks",
   },
   {
     name: "auth_token",
-    description: "Maintains authenticated access",
+    description:
+      "Maintains authenticated access",
   },
   {
     name: "cookie_consent",
-    description: "Stores the user's consent choice",
+    description:
+      "Stores the user's consent choice",
   },
   {
     name: "language",
-    description: "Stores the selected language",
+    description:
+      "Stores the selected language",
   },
   {
     name: "load_balancer",
-    description: "Maintains server routing",
+    description:
+      "Maintains server routing",
   },
 ];
 
@@ -42,17 +56,18 @@ function NewScanPage() {
   const navigate = useNavigate();
   const allowlistRef = useRef(null);
 
-  const [targetUrl, setTargetUrl] = useState(
-    "http://localhost:3000",
-  );
+  const [targetUrl, setTargetUrl] =
+    useState("http://localhost:3000");
 
-  const [rejectSelector, setRejectSelector] = useState(
-    "#reject-all",
-  );
+  const [
+    rejectSelector,
+    setRejectSelector,
+  ] = useState("#reject-all");
 
-  const [sourceFolder, setSourceFolder] = useState(
-    defaultScanSettings.sourceFolder,
-  );
+  const [sourceFolder, setSourceFolder] =
+    useState(
+      defaultScanSettings.sourceFolder,
+    );
 
   const [browser, setBrowser] = useState(
     defaultScanSettings.browser,
@@ -62,128 +77,211 @@ function NewScanPage() {
     defaultScanSettings.waitTime,
   );
 
-  const [consentAction, setConsentAction] = useState("reject");
+  const [
+    consentAction,
+    setConsentAction,
+  ] = useState("reject");
 
-  const [scanOptions, setScanOptions] = useState({
-    checkCookies: true,
-    checkNetworkRequests: true,
-    checkStorage: true,
-    scanSourceCode: true,
-  });
+  const [scanOptions, setScanOptions] =
+    useState({
+      checkCookies: true,
+      checkNetworkRequests: true,
+      checkStorage: true,
+      scanSourceCode: true,
+    });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isScanRunning, setIsScanRunning] = useState(false);
-  const [activeScanId, setActiveScanId] = useState(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
 
-  const [isAllowlistOpen, setIsAllowlistOpen] = useState(false);
-  const [allowlistSearch, setAllowlistSearch] = useState("");
+  const [isScanRunning, setIsScanRunning] =
+    useState(false);
 
-  const [selectedCookies, setSelectedCookies] = useState([
+  const [activeScanId, setActiveScanId] =
+    useState(null);
+
+  const [
+    activeTargetUrl,
+    setActiveTargetUrl,
+  ] = useState("");
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
+  const [
+    isAllowlistOpen,
+    setIsAllowlistOpen,
+  ] = useState(false);
+
+  const [
+    allowlistSearch,
+    setAllowlistSearch,
+  ] = useState("");
+
+  const [
+    selectedCookies,
+    setSelectedCookies,
+  ] = useState([
     "session_id",
     "csrf_token",
   ]);
 
   useEffect(() => {
-    const savedSettings = window.localStorage.getItem(
-      "cookiesolve-settings",
-    );
+    const savedSettings =
+      window.localStorage.getItem(
+        "cookiesolve-settings",
+      );
 
     if (!savedSettings) {
       return;
     }
 
     try {
-      const parsedSettings = JSON.parse(savedSettings);
+      const parsedSettings =
+        JSON.parse(savedSettings);
 
       if (parsedSettings.browser) {
-        setBrowser(parsedSettings.browser);
+        setBrowser(
+          parsedSettings.browser,
+        );
       }
 
-      if (Number.isFinite(Number(parsedSettings.waitTime))) {
-        setWaitTime(Number(parsedSettings.waitTime));
+      if (
+        Number.isFinite(
+          Number(
+            parsedSettings.waitTime,
+          ),
+        )
+      ) {
+        setWaitTime(
+          Number(
+            parsedSettings.waitTime,
+          ),
+        );
       }
 
-      if (parsedSettings.sourceFolder) {
-        setSourceFolder(parsedSettings.sourceFolder);
+      if (
+        parsedSettings.sourceFolder
+      ) {
+        setSourceFolder(
+          parsedSettings.sourceFolder,
+        );
       }
     } catch {
-      // Invalid settings are ignored and defaults are used.
+      // Invalid saved settings are ignored.
     }
   }, []);
 
   useEffect(() => {
-    const closeDropdown = (event) => {
+    function closeDropdown(event) {
       if (
         allowlistRef.current &&
-        !allowlistRef.current.contains(event.target)
+        !allowlistRef.current.contains(
+          event.target,
+        )
       ) {
         setIsAllowlistOpen(false);
       }
-    };
+    }
 
-    document.addEventListener("mousedown", closeDropdown);
+    document.addEventListener(
+      "mousedown",
+      closeDropdown,
+    );
 
     return () => {
-      document.removeEventListener("mousedown", closeDropdown);
+      document.removeEventListener(
+        "mousedown",
+        closeDropdown,
+      );
     };
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = isScanRunning ? "hidden" : "";
+    document.body.style.overflow =
+      isScanRunning
+        ? "hidden"
+        : "";
 
     return () => {
       document.body.style.overflow = "";
     };
   }, [isScanRunning]);
 
-  const filteredCookieOptions = necessaryCookieOptions.filter(
-    (cookie) => {
-      const searchValue = allowlistSearch.toLowerCase();
+  const filteredCookieOptions =
+    necessaryCookieOptions.filter(
+      (cookie) => {
+        const searchValue =
+          allowlistSearch
+            .trim()
+            .toLowerCase();
 
-      return (
-        cookie.name.toLowerCase().includes(searchValue) ||
-        cookie.description.toLowerCase().includes(searchValue)
-      );
-    },
-  );
-
-  const toggleCookie = (cookieName) => {
-    setSelectedCookies((currentCookies) => {
-      if (currentCookies.includes(cookieName)) {
-        return currentCookies.filter(
-          (cookie) => cookie !== cookieName,
+        return (
+          cookie.name
+            .toLowerCase()
+            .includes(searchValue) ||
+          cookie.description
+            .toLowerCase()
+            .includes(searchValue)
         );
-      }
-
-      return [...currentCookies, cookieName];
-    });
-  };
-
-  const removeCookie = (cookieName) => {
-    setSelectedCookies((currentCookies) =>
-      currentCookies.filter(
-        (cookie) => cookie !== cookieName,
-      ),
+      },
     );
-  };
 
-  const addCustomCookie = () => {
-    const cookieName = allowlistSearch.trim();
+  function toggleCookie(cookieName) {
+    setSelectedCookies(
+      (currentCookies) => {
+        if (
+          currentCookies.includes(
+            cookieName,
+          )
+        ) {
+          return currentCookies.filter(
+            (cookie) =>
+              cookie !== cookieName,
+          );
+        }
 
-    if (!cookieName || selectedCookies.includes(cookieName)) {
+        return [
+          ...currentCookies,
+          cookieName,
+        ];
+      },
+    );
+  }
+
+  function removeCookie(cookieName) {
+    setSelectedCookies(
+      (currentCookies) =>
+        currentCookies.filter(
+          (cookie) =>
+            cookie !== cookieName,
+        ),
+    );
+  }
+
+  function addCustomCookie() {
+    const cookieName =
+      allowlistSearch.trim();
+
+    if (
+      !cookieName ||
+      selectedCookies.includes(
+        cookieName,
+      )
+    ) {
       return;
     }
 
-    setSelectedCookies((currentCookies) => [
-      ...currentCookies,
-      cookieName,
-    ]);
+    setSelectedCookies(
+      (currentCookies) => [
+        ...currentCookies,
+        cookieName,
+      ],
+    );
 
     setAllowlistSearch("");
-  };
+  }
 
-  const handleSearchKeyDown = (event) => {
+  function handleSearchKeyDown(event) {
     if (event.key === "Enter") {
       event.preventDefault();
       addCustomCookie();
@@ -192,29 +290,45 @@ function NewScanPage() {
     if (event.key === "Escape") {
       setIsAllowlistOpen(false);
     }
-  };
+  }
 
-  const updateScanOption = (event) => {
-    const { name, checked } = event.target;
+  function updateScanOption(event) {
+    const { name, checked } =
+      event.target;
 
-    setScanOptions((currentOptions) => ({
-      ...currentOptions,
-      [name]: checked,
-    }));
-  };
+    setScanOptions(
+      (currentOptions) => ({
+        ...currentOptions,
+        [name]: checked,
+      }),
+    );
+  }
 
-  const handleRunScan = async (event) => {
+  async function handleRunScan(event) {
     event.preventDefault();
 
-    if (!targetUrl.trim()) {
-      setErrorMessage("Enter the website URL you want to scan.");
+    const cleanedTargetUrl =
+      targetUrl.trim();
+
+    const cleanedRejectSelector =
+      rejectSelector.trim();
+
+    if (!cleanedTargetUrl) {
+      setErrorMessage(
+        "Enter the website URL you want to scan.",
+      );
+
       return;
     }
 
-    if (consentAction === "reject" && !rejectSelector.trim()) {
+    if (
+      consentAction === "reject" &&
+      !cleanedRejectSelector
+    ) {
       setErrorMessage(
         "Enter the CSS selector for the Reject All button.",
       );
+
       return;
     }
 
@@ -223,43 +337,95 @@ function NewScanPage() {
 
     try {
       const data = await startScan({
-        targetUrl: targetUrl.trim(),
+        targetUrl: cleanedTargetUrl,
 
-        // The first runtime version currently performs rejection testing.
-        rejectSelector: rejectSelector.trim(),
+        rejectSelector:
+          cleanedRejectSelector,
 
         browser,
-        waitTime: Number(waitTime),
 
-        consentAction,
-        sourceFolder: sourceFolder.trim(),
-        necessaryCookies: selectedCookies,
-        scanOptions,
+        waitTime:
+          Number(waitTime),
+
+        necessaryCookieAllowlist:
+          selectedCookies,
+
+        sourceCodeFolder:
+          sourceFolder.trim(),
+
+        scanOptions: {
+          cookies:
+            scanOptions.checkCookies,
+
+          networkRequests:
+            scanOptions.checkNetworkRequests,
+
+          browserStorage:
+            scanOptions.checkStorage,
+
+          sourceCode:
+            scanOptions.scanSourceCode,
+        },
       });
 
-      setActiveScanId(data.scan.id);
+      const createdScanId =
+        data?.scan?._id ??
+        data?.scan?.id;
+
+      if (!createdScanId) {
+        throw new Error(
+          "The server created the scan but did not return its ID.",
+        );
+      }
+
+      setActiveScanId(
+        createdScanId,
+      );
+
+      setActiveTargetUrl(
+        cleanedTargetUrl,
+      );
+
       setIsScanRunning(true);
     } catch (error) {
+      console.error(
+        "Unable to start scan:",
+        error,
+      );
+
       setErrorMessage(
-        error.message || "Unable to start the scan.",
+        error.message ||
+          "Unable to start the scan.",
       );
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }
 
-  const handleScanComplete = (completedScanId) => {
-    setIsScanRunning(false);
+  const handleScanComplete =
+    useCallback(
+      (completedScanId) => {
+        setIsScanRunning(false);
+        setActiveScanId(null);
 
-    navigate(`/scan-results?scan=${completedScanId}`);
-  };
+        navigate(
+          `/scan-results?scan=${completedScanId}`,
+        );
+      },
+      [navigate],
+    );
 
-  const handleCloseProgress = () => {
-    setIsScanRunning(false);
-  };
+  const handleCloseProgress =
+    useCallback(() => {
+      setIsScanRunning(false);
+      setActiveScanId(null);
+    }, []);
 
   return (
-    <DashboardLayout activePage="New Scan" title="New Scan">
+    <DashboardLayout
+      activePage="New Scan"
+      title="New Scan"
+    >
       <section className="new-scan-page">
         <h1>Setup Scan</h1>
 
@@ -280,23 +446,33 @@ function NewScanPage() {
               placeholder="http://localhost:3000"
               required
               onChange={(event) => {
-                setTargetUrl(event.target.value);
+                setTargetUrl(
+                  event.target.value,
+                );
+
                 setErrorMessage("");
               }}
             />
           </div>
 
           <fieldset className="scan-option-group consent-action-group">
-            <legend>Consent Action</legend>
+            <legend>
+              Consent Action
+            </legend>
 
             <label className="scan-radio-option">
               <input
                 type="radio"
                 name="consentAction"
                 value="accept"
-                checked={consentAction === "accept"}
+                checked={
+                  consentAction ===
+                  "accept"
+                }
                 onChange={(event) =>
-                  setConsentAction(event.target.value)
+                  setConsentAction(
+                    event.target.value,
+                  )
                 }
               />
 
@@ -313,9 +489,14 @@ function NewScanPage() {
                 type="radio"
                 name="consentAction"
                 value="reject"
-                checked={consentAction === "reject"}
+                checked={
+                  consentAction ===
+                  "reject"
+                }
                 onChange={(event) =>
-                  setConsentAction(event.target.value)
+                  setConsentAction(
+                    event.target.value,
+                  )
                 }
               />
 
@@ -340,14 +521,16 @@ function NewScanPage() {
               value={rejectSelector}
               placeholder="#reject-all"
               onChange={(event) => {
-                setRejectSelector(event.target.value);
+                setRejectSelector(
+                  event.target.value,
+                );
+
                 setErrorMessage("");
               }}
             />
 
             <small className="scan-field-help">
-              Enter the CSS selector used to identify the website’s
-              Reject All button.
+              Enter the CSS selector used to identify the website’s Reject All button.
             </small>
           </div>
 
@@ -363,7 +546,9 @@ function NewScanPage() {
               value={sourceFolder}
               placeholder="./src"
               onChange={(event) =>
-                setSourceFolder(event.target.value)
+                setSourceFolder(
+                  event.target.value,
+                )
               }
             />
           </div>
@@ -377,61 +562,89 @@ function NewScanPage() {
             </label>
 
             <button
-              className={`cookie-allowlist-trigger ${
-                isAllowlistOpen ? "open" : ""
-              }`}
+              className={[
+                "cookie-allowlist-trigger",
+                isAllowlistOpen
+                  ? "open"
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               type="button"
               aria-labelledby="cookie-allowlist-label"
               aria-haspopup="listbox"
-              aria-expanded={isAllowlistOpen}
+              aria-expanded={
+                isAllowlistOpen
+              }
               onClick={() =>
-                setIsAllowlistOpen((current) => !current)
+                setIsAllowlistOpen(
+                  (current) =>
+                    !current,
+                )
               }
             >
               <span className="selected-cookie-preview">
-                {selectedCookies.length === 0 ? (
+                {selectedCookies.length ===
+                0 ? (
                   <span className="allowlist-placeholder">
                     Select necessary cookies
                   </span>
                 ) : (
                   selectedCookies
                     .slice(0, 2)
-                    .map((cookieName) => (
-                      <span
-                        className="selected-cookie-chip"
-                        key={cookieName}
-                      >
-                        {cookieName}
-
+                    .map(
+                      (cookieName) => (
                         <span
-                          className="selected-cookie-remove"
-                          role="button"
-                          tabIndex="0"
-                          aria-label={`Remove ${cookieName}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            removeCookie(cookieName);
-                          }}
-                          onKeyDown={(event) => {
-                            if (
-                              event.key === "Enter" ||
-                              event.key === " "
-                            ) {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              removeCookie(cookieName);
-                            }
-                          }}
+                          className="selected-cookie-chip"
+                          key={cookieName}
                         >
-                          ×
+                          {cookieName}
+
+                          <span
+                            className="selected-cookie-remove"
+                            role="button"
+                            tabIndex="0"
+                            aria-label={`Remove ${cookieName}`}
+                            onClick={(
+                              event,
+                            ) => {
+                              event.stopPropagation();
+
+                              removeCookie(
+                                cookieName,
+                              );
+                            }}
+                            onKeyDown={(
+                              event,
+                            ) => {
+                              if (
+                                event.key ===
+                                  "Enter" ||
+                                event.key ===
+                                  " "
+                              ) {
+                                event.preventDefault();
+                                event.stopPropagation();
+
+                                removeCookie(
+                                  cookieName,
+                                );
+                              }
+                            }}
+                          >
+                            ×
+                          </span>
                         </span>
-                      </span>
-                    ))
+                      ),
+                    )
                 )}
 
-                {selectedCookies.length > 2 && (
+                {selectedCookies.length >
+                  2 && (
                   <span className="selected-cookie-count">
-                    +{selectedCookies.length - 2}
+                    +
+                    {selectedCookies.length -
+                      2}
                   </span>
                 )}
               </span>
@@ -455,13 +668,20 @@ function NewScanPage() {
 
                   <input
                     type="text"
-                    value={allowlistSearch}
+                    value={
+                      allowlistSearch
+                    }
                     placeholder="Search or add a cookie"
                     aria-label="Search or add a necessary cookie"
                     onChange={(event) =>
-                      setAllowlistSearch(event.target.value)
+                      setAllowlistSearch(
+                        event.target
+                          .value,
+                      )
                     }
-                    onKeyDown={handleSearchKeyDown}
+                    onKeyDown={
+                      handleSearchKeyDown
+                    }
                   />
                 </div>
 
@@ -470,48 +690,75 @@ function NewScanPage() {
                   role="listbox"
                   aria-multiselectable="true"
                 >
-                  {filteredCookieOptions.map((cookie) => {
-                    const isSelected =
-                      selectedCookies.includes(cookie.name);
+                  {filteredCookieOptions.map(
+                    (cookie) => {
+                      const isSelected =
+                        selectedCookies.includes(
+                          cookie.name,
+                        );
 
-                    return (
-                      <button
-                        className={`cookie-option ${
-                          isSelected ? "selected" : ""
-                        }`}
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        key={cookie.name}
-                        onClick={() =>
-                          toggleCookie(cookie.name)
-                        }
-                      >
-                        <span className="cookie-option-check">
-                          {isSelected && (
-                            <svg
-                              viewBox="0 0 16 16"
-                              aria-hidden="true"
-                            >
-                              <path d="m3 8.2 3 3L13 4.8" />
-                            </svg>
-                          )}
-                        </span>
+                      return (
+                        <button
+                          className={[
+                            "cookie-option",
+                            isSelected
+                              ? "selected"
+                              : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          type="button"
+                          role="option"
+                          aria-selected={
+                            isSelected
+                          }
+                          key={
+                            cookie.name
+                          }
+                          onClick={() =>
+                            toggleCookie(
+                              cookie.name,
+                            )
+                          }
+                        >
+                          <span className="cookie-option-check">
+                            {isSelected && (
+                              <svg
+                                viewBox="0 0 16 16"
+                                aria-hidden="true"
+                              >
+                                <path d="m3 8.2 3 3L13 4.8" />
+                              </svg>
+                            )}
+                          </span>
 
-                        <span className="cookie-option-text">
-                          <strong>{cookie.name}</strong>
-                          <small>{cookie.description}</small>
-                        </span>
-                      </button>
-                    );
-                  })}
+                          <span className="cookie-option-text">
+                            <strong>
+                              {
+                                cookie.name
+                              }
+                            </strong>
 
-                  {filteredCookieOptions.length === 0 &&
+                            <small>
+                              {
+                                cookie.description
+                              }
+                            </small>
+                          </span>
+                        </button>
+                      );
+                    },
+                  )}
+
+                  {filteredCookieOptions.length ===
+                    0 &&
                     allowlistSearch.trim() && (
                       <button
                         className="add-custom-cookie-button"
                         type="button"
-                        onClick={addCustomCookie}
+                        onClick={
+                          addCustomCookie
+                        }
                       >
                         <span className="add-custom-cookie-icon">
                           +
@@ -520,7 +767,9 @@ function NewScanPage() {
                         <span>
                           Add{" "}
                           <strong>
-                            “{allowlistSearch.trim()}”
+                            “
+                            {allowlistSearch.trim()}
+                            ”
                           </strong>
                         </span>
                       </button>
@@ -529,12 +778,19 @@ function NewScanPage() {
 
                 <div className="allowlist-menu-footer">
                   <span>
-                    {selectedCookies.length} selected
+                    {
+                      selectedCookies.length
+                    }{" "}
+                    selected
                   </span>
 
                   <button
                     type="button"
-                    onClick={() => setSelectedCookies([])}
+                    onClick={() =>
+                      setSelectedCookies(
+                        [],
+                      )
+                    }
                   >
                     Clear all
                   </button>
@@ -544,14 +800,20 @@ function NewScanPage() {
           </div>
 
           <fieldset className="scan-option-group scan-options-group">
-            <legend>Scan Options</legend>
+            <legend>
+              Scan Options
+            </legend>
 
             <label className="scan-checkbox-option">
               <input
                 type="checkbox"
                 name="checkCookies"
-                checked={scanOptions.checkCookies}
-                onChange={updateScanOption}
+                checked={
+                  scanOptions.checkCookies
+                }
+                onChange={
+                  updateScanOption
+                }
               />
 
               <span
@@ -559,15 +821,21 @@ function NewScanPage() {
                 aria-hidden="true"
               />
 
-              <span>Check cookies</span>
+              <span>
+                Check cookies
+              </span>
             </label>
 
             <label className="scan-checkbox-option">
               <input
                 type="checkbox"
                 name="checkNetworkRequests"
-                checked={scanOptions.checkNetworkRequests}
-                onChange={updateScanOption}
+                checked={
+                  scanOptions.checkNetworkRequests
+                }
+                onChange={
+                  updateScanOption
+                }
               />
 
               <span
@@ -575,15 +843,21 @@ function NewScanPage() {
                 aria-hidden="true"
               />
 
-              <span>Check network requests</span>
+              <span>
+                Check network requests
+              </span>
             </label>
 
             <label className="scan-checkbox-option">
               <input
                 type="checkbox"
                 name="checkStorage"
-                checked={scanOptions.checkStorage}
-                onChange={updateScanOption}
+                checked={
+                  scanOptions.checkStorage
+                }
+                onChange={
+                  updateScanOption
+                }
               />
 
               <span
@@ -600,8 +874,12 @@ function NewScanPage() {
               <input
                 type="checkbox"
                 name="scanSourceCode"
-                checked={scanOptions.scanSourceCode}
-                onChange={updateScanOption}
+                checked={
+                  scanOptions.scanSourceCode
+                }
+                onChange={
+                  updateScanOption
+                }
               />
 
               <span
@@ -609,12 +887,17 @@ function NewScanPage() {
                 aria-hidden="true"
               />
 
-              <span>Scan source code</span>
+              <span>
+                Scan source code
+              </span>
             </label>
           </fieldset>
 
           {errorMessage && (
-            <p className="scan-form-error" role="alert">
+            <p
+              className="scan-form-error"
+              role="alert"
+            >
               {errorMessage}
             </p>
           )}
@@ -624,7 +907,9 @@ function NewScanPage() {
               className="scan-action-button"
               type="button"
               disabled={isSubmitting}
-              onClick={() => navigate("/dashboard")}
+              onClick={() =>
+                navigate("/dashboard")
+              }
             >
               Cancel
             </button>
@@ -632,22 +917,34 @@ function NewScanPage() {
             <button
               className="scan-action-button"
               type="submit"
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                isScanRunning
+              }
             >
-              {isSubmitting ? "Starting Scan..." : "Run Scan"}
+              {isSubmitting
+                ? "Starting Scan..."
+                : "Run Scan"}
             </button>
           </div>
         </form>
       </section>
 
-      {isScanRunning && activeScanId && (
-        <ScanProgressModal
-          scanId={activeScanId}
-          targetUrl={targetUrl}
-          onCancel={handleCloseProgress}
-          onComplete={handleScanComplete}
-        />
-      )}
+      {isScanRunning &&
+        activeScanId && (
+          <ScanProgressModal
+            scanId={activeScanId}
+            targetUrl={
+              activeTargetUrl
+            }
+            onCancel={
+              handleCloseProgress
+            }
+            onComplete={
+              handleScanComplete
+            }
+          />
+        )}
     </DashboardLayout>
   );
 }
