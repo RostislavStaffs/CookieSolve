@@ -1,193 +1,431 @@
 import Scan from "../models/Scan.js";
-import { runRuntimeScan } from "../../src/services/runtimeScanner.js";
 
-function normaliseTargetUrl(value) {
-  const trimmedValue = value.trim();
+import {
+  runRuntimeScan,
+} from "../services/runtimeScanner.js";
 
-  if (
-    trimmedValue.startsWith("http://") ||
-    trimmedValue.startsWith("https://")
-  ) {
-    return trimmedValue;
-  }
+import {
+  analyseRuntimeFindings,
+} from "../services/findingsAnalyzer.js";
 
-  return `http://${trimmedValue}`;
+function getAuthenticatedUserId(request) {
+  return (
+    request.user?._id ??
+    request.user?.id ??
+    request.user?.userId ??
+    null
+  );
 }
 
-function validateTargetUrl(value) {
-  try {
-    const parsedUrl = new URL(value);
+function parseAllowlist(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) =>
+        String(item).trim(),
+      )
+      .filter(Boolean);
+  }
 
-    return ["http:", "https:"].includes(parsedUrl.protocol);
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function parseBoolean(
+  value,
+  defaultValue,
+) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  return defaultValue;
+}
+
+function validateTargetUrl(targetUrl) {
+  try {
+    const parsedUrl =
+      new URL(targetUrl);
+
+    return ["http:", "https:"].includes(
+      parsedUrl.protocol,
+    );
   } catch {
     return false;
   }
 }
 
-function buildSummary(preConsent, postRejection) {
-  const preConsentThirdPartyRequests =
-    preConsent.networkRequests.filter(
-      (request) => request.isThirdParty,
-    );
-
-  const postRejectionThirdPartyRequests =
-    postRejection.networkRequests.filter(
-      (request) => request.isThirdParty,
-    );
-
-  /*
-   * This is an initial technical warning count, not a legal
-   * compliance determination. Classification will be improved later.
-   */
-  const issuesDetected =
-    preConsent.cookies.length +
-    postRejection.cookies.length +
-    preConsentThirdPartyRequests.length +
-    postRejectionThirdPartyRequests.length;
-
+function createLegacySummary({
+  preConsent,
+  postRejection,
+  findingsSummary,
+}) {
   return {
-    cookiesBeforeConsent: preConsent.cookies.length,
-    cookiesAfterRejection: postRejection.cookies.length,
+    cookiesBeforeConsent:
+      preConsent.cookies.length,
+
+    cookiesAfterRejection:
+      postRejection.cookies.length,
+
     thirdPartyRequestsBeforeConsent:
-      preConsentThirdPartyRequests.length,
+      preConsent.networkRequests.filter(
+        (request) =>
+          request.isThirdParty,
+      ).length,
+
     thirdPartyRequestsAfterRejection:
-      postRejectionThirdPartyRequests.length,
-    issuesDetected,
+      postRejection.networkRequests.filter(
+        (request) =>
+          request.isThirdParty,
+      ).length,
+
+    issuesDetected:
+      findingsSummary.total,
   };
 }
 
-export async function createScan(request, response) {
-  const {
-    targetUrl,
-    rejectSelector,
-    browser = "chromium",
-    waitTime = 3000,
-  } = request.body;
-
-  if (!targetUrl?.trim()) {
-    return response.status(400).json({
-      message: "Enter a target website URL.",
-    });
-  }
-
-  if (!rejectSelector?.trim()) {
-    return response.status(400).json({
-      message: "Enter the CSS selector for the reject button.",
-    });
-  }
-
-  const normalisedUrl = normaliseTargetUrl(targetUrl);
-
-  if (!validateTargetUrl(normalisedUrl)) {
-    return response.status(400).json({
-      message: "Enter a valid HTTP or HTTPS URL.",
-    });
-  }
-
-  const parsedWaitTime = Number(waitTime);
-
-  if (
-    !Number.isFinite(parsedWaitTime) ||
-    parsedWaitTime < 0 ||
-    parsedWaitTime > 30000
-  ) {
-    return response.status(400).json({
-      message: "Wait time must be between 0 and 30000 milliseconds.",
-    });
-  }
-
-  const scan = await Scan.create({
-    user: request.user._id,
-    targetUrl: normalisedUrl,
-    rejectSelector: rejectSelector.trim(),
-    browser,
-    waitTime: parsedWaitTime,
-    status: "running",
-    currentStep: "Preparing scan",
-    startedAt: new Date(),
-  });
-
-  /*
-   * Return immediately so the frontend is not forced to keep one
-   * long HTTP request open throughout the browser scan.
-   */
-  response.status(202).json({
-    message: "Scan started.",
-    scan: {
-      id: scan._id,
-      status: scan.status,
-      currentStep: scan.currentStep,
+async function updateScanStep(
+  scanId,
+  currentStep,
+) {
+  await Scan.findByIdAndUpdate(
+    scanId,
+    {
+      currentStep,
     },
-  });
+  );
+}
 
+async function executeScan(scanId) {
   try {
-    const results = await runRuntimeScan({
-      targetUrl: scan.targetUrl,
-      rejectSelector: scan.rejectSelector,
-      browserName: scan.browser,
-      waitTime: scan.waitTime,
+    const scan =
+      await Scan.findById(scanId);
 
-      onProgress: async (currentStep) => {
-        await Scan.findByIdAndUpdate(scan._id, {
+    if (!scan) {
+      return;
+    }
+
+    scan.status = "running";
+    scan.currentStep =
+      "Starting runtime scan";
+    scan.startedAt = new Date();
+    scan.errorMessage = "";
+
+    await scan.save();
+
+    const runtimeResult =
+      await runRuntimeScan({
+        targetUrl: scan.targetUrl,
+        rejectSelector:
+          scan.rejectSelector,
+        browser: scan.browser,
+        waitTime: scan.waitTime,
+
+        onStepChange: async (
           currentStep,
-        });
-      },
-    });
+        ) => {
+          await updateScanStep(
+            scan._id,
+            currentStep,
+          );
+        },
+      });
 
-    const summary = buildSummary(
-      results.preConsent,
-      results.postRejection,
+    await updateScanStep(
+      scan._id,
+      "Analysing captured evidence",
     );
 
-    await Scan.findByIdAndUpdate(scan._id, {
-      status: "completed",
-      currentStep: "Scan completed",
-      preConsent: results.preConsent,
-      postRejection: results.postRejection,
-      summary,
-      completedAt: new Date(),
-      errorMessage: "",
+    const analysis =
+      analyseRuntimeFindings({
+        preConsent:
+          runtimeResult.preConsent,
+
+        postRejection:
+          runtimeResult.postRejection,
+
+        necessaryCookieAllowlist:
+          scan.necessaryCookieAllowlist,
+      });
+
+    scan.preConsent =
+      runtimeResult.preConsent;
+
+    scan.postRejection =
+      runtimeResult.postRejection;
+
+    scan.findings =
+      analysis.findings;
+
+    scan.findingsSummary =
+      analysis.summary;
+
+    /*
+     * Temporary compatibility summary.
+     * We will remove this after updating
+     * the frontend results page.
+     */
+    scan.summary =
+      createLegacySummary({
+        preConsent:
+          runtimeResult.preConsent,
+
+        postRejection:
+          runtimeResult.postRejection,
+
+        findingsSummary:
+          analysis.summary,
+      });
+
+    scan.status = "completed";
+    scan.currentStep =
+      "Scan completed";
+    scan.completedAt = new Date();
+    scan.errorMessage = "";
+
+    await scan.save();
+  } catch (error) {
+    console.error(
+      "Runtime scan failed:",
+      error,
+    );
+
+    await Scan.findByIdAndUpdate(
+      scanId,
+      {
+        status: "failed",
+        currentStep: "Scan failed",
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "The runtime scan failed.",
+        completedAt: new Date(),
+      },
+    );
+  }
+}
+
+export async function createScan(
+  request,
+  response,
+) {
+  try {
+    const userId =
+      getAuthenticatedUserId(request);
+
+    if (!userId) {
+      return response.status(401).json({
+        message:
+          "Authentication is required.",
+      });
+    }
+
+    const {
+      targetUrl,
+      rejectSelector,
+      browser = "chromium",
+      waitTime = 1500,
+      sourceCodeFolder = "",
+      scanOptions = {},
+    } = request.body;
+
+    if (
+      !targetUrl ||
+      !validateTargetUrl(targetUrl)
+    ) {
+      return response.status(400).json({
+        message:
+          "Enter a valid HTTP or HTTPS target URL.",
+      });
+    }
+
+    if (
+      !rejectSelector ||
+      typeof rejectSelector !== "string"
+    ) {
+      return response.status(400).json({
+        message:
+          "A reject-button CSS selector is required.",
+      });
+    }
+
+    const numericWaitTime =
+      Number(waitTime);
+
+    if (
+      !Number.isFinite(
+        numericWaitTime,
+      ) ||
+      numericWaitTime < 0 ||
+      numericWaitTime > 30000
+    ) {
+      return response.status(400).json({
+        message:
+          "Wait time must be between 0 and 30000 milliseconds.",
+      });
+    }
+
+    const supportedBrowsers = [
+      "chromium",
+      "firefox",
+      "webkit",
+    ];
+
+    if (
+      !supportedBrowsers.includes(browser)
+    ) {
+      return response.status(400).json({
+        message:
+          "The selected browser is not supported.",
+      });
+    }
+
+    const necessaryCookieAllowlist =
+      parseAllowlist(
+        request.body
+          .necessaryCookieAllowlist,
+      );
+
+    const scan = await Scan.create({
+      user: userId,
+      targetUrl: targetUrl.trim(),
+      rejectSelector:
+        rejectSelector.trim(),
+      browser,
+      waitTime: numericWaitTime,
+      necessaryCookieAllowlist,
+      sourceCodeFolder:
+        String(sourceCodeFolder).trim(),
+
+      scanOptions: {
+        cookies: parseBoolean(
+          scanOptions.cookies,
+          true,
+        ),
+
+        networkRequests: parseBoolean(
+          scanOptions.networkRequests,
+          true,
+        ),
+
+        browserStorage: parseBoolean(
+          scanOptions.browserStorage,
+          true,
+        ),
+
+        sourceCode: parseBoolean(
+          scanOptions.sourceCode,
+          false,
+        ),
+      },
+
+      status: "pending",
+      currentStep:
+        "Waiting to start",
+    });
+
+    /*
+     * Start asynchronously so the frontend
+     * receives the scan ID immediately and
+     * can poll for progress.
+     */
+    void executeScan(scan._id);
+
+    return response.status(202).json({
+      message: "Scan started.",
+      scan,
     });
   } catch (error) {
-    console.error(`Scan ${scan._id} failed:`, error);
-
-    await Scan.findByIdAndUpdate(scan._id, {
-      status: "failed",
-      currentStep: "Scan failed",
-      errorMessage:
-        error.message || "An unexpected scan error occurred.",
-      completedAt: new Date(),
-    });
-  }
-}
-
-export async function getScan(request, response) {
-  const scan = await Scan.findOne({
-    _id: request.params.scanId,
-    user: request.user._id,
-  });
-
-  if (!scan) {
-    return response.status(404).json({
-      message: "Scan not found.",
-    });
-  }
-
-  return response.status(200).json({
-    scan,
-  });
-}
-
-export async function getScans(request, response) {
-  const scans = await Scan.find({
-    user: request.user._id,
-  })
-    .sort({ createdAt: -1 })
-    .select(
-      "targetUrl browser status currentStep summary createdAt completedAt errorMessage",
+    console.error(
+      "Unable to create scan:",
+      error,
     );
 
-  return response.status(200).json({
-    scans,
-  });
+    return response.status(500).json({
+      message:
+        "The scan could not be started.",
+    });
+  }
+}
+
+export async function getScan(
+  request,
+  response,
+) {
+  try {
+    const userId =
+      getAuthenticatedUserId(request);
+
+    const { scanId } = request.params;
+
+    const scan = await Scan.findOne({
+      _id: scanId,
+      user: userId,
+    }).lean();
+
+    if (!scan) {
+      return response.status(404).json({
+        message: "Scan not found.",
+      });
+    }
+
+    return response.status(200).json({
+      scan,
+    });
+  } catch (error) {
+    console.error(
+      "Unable to retrieve scan:",
+      error,
+    );
+
+    return response.status(500).json({
+      message:
+        "The scan could not be retrieved.",
+    });
+  }
+}
+
+export async function getScans(
+  request,
+  response,
+) {
+  try {
+    const userId =
+      getAuthenticatedUserId(request);
+
+    const scans = await Scan.find({
+      user: userId,
+    })
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
+
+    return response.status(200).json({
+      scans,
+    });
+  } catch (error) {
+    console.error(
+      "Unable to retrieve scans:",
+      error,
+    );
+
+    return response.status(500).json({
+      message:
+        "The scans could not be retrieved.",
+    });
+  }
 }
