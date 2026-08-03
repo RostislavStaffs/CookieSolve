@@ -685,3 +685,42 @@
     transition: none;
   }
 }
+.scan-history-delete-button {
+  padding: 3px 0;
+  border: 0;
+
+  background: transparent;
+  color: #e46675;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    color 180ms ease,
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+
+.scan-history-delete-button:hover:not(:disabled) {
+  color: #ff8794;
+  transform: translateX(2px);
+}
+
+.scan-history-delete-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.scan-history-delete-button:focus-visible {
+  outline: 2px solid #ff8995;
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-history-delete-button {
+    transition: none;
+  }
+}

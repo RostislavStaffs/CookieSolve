@@ -10,7 +10,12 @@ import {
 } from "react-router-dom";
 
 import DashboardLayout from "../components/DashboardLayout";
-import { getScans } from "../services/scanApi";
+import DeleteScanModal from "../components/DeleteScanModal";
+
+import {
+  deleteScan,
+  getScans,
+} from "../services/scanApi";
 
 import "./ScanHistoryPage.css";
 
@@ -22,30 +27,44 @@ const statusOptions = [
   "Running",
 ];
 
-function formatScanDate(dateValue) {
+function formatScanDate(
+  dateValue,
+) {
   if (!dateValue) {
     return "Unknown date";
   }
 
-  const date = new Date(dateValue);
+  const date =
+    new Date(dateValue);
 
-  if (Number.isNaN(date.getTime())) {
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
     return "Unknown date";
   }
 
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return new Intl.DateTimeFormat(
+    "en-GB",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  ).format(date);
 }
 
-function getScanIssueCount(scan) {
+function getScanIssueCount(
+  scan,
+) {
   if (
     Number.isFinite(
-      Number(scan?.findingsSummary?.total),
+      Number(
+        scan?.findingsSummary?.total,
+      ),
     )
   ) {
     return Number(
@@ -55,7 +74,9 @@ function getScanIssueCount(scan) {
 
   if (
     Number.isFinite(
-      Number(scan?.summary?.issuesDetected),
+      Number(
+        scan?.summary?.issuesDetected,
+      ),
     )
   ) {
     return Number(
@@ -63,7 +84,11 @@ function getScanIssueCount(scan) {
     );
   }
 
-  if (Array.isArray(scan?.findings)) {
+  if (
+    Array.isArray(
+      scan?.findings,
+    )
+  ) {
     return scan.findings.length;
   }
 
@@ -82,50 +107,36 @@ function getScanStatus(scan) {
     return "Running";
   }
 
-  const highCount =
-    Number(
-      scan?.findingsSummary?.high,
-    ) || 0;
-
-  const mediumCount =
-    Number(
-      scan?.findingsSummary?.medium,
-    ) || 0;
-
-  const lowCount =
-    Number(
-      scan?.findingsSummary?.low,
-    ) || 0;
-
   const totalIssues =
     getScanIssueCount(scan);
 
-  if (
-    highCount > 0 ||
-    mediumCount > 0 ||
-    lowCount > 0 ||
-    totalIssues > 0
-  ) {
-    return "Warning";
-  }
-
-  return "Passed";
+  return totalIssues > 0
+    ? "Warning"
+    : "Passed";
 }
 
-function getStatusClassName(status) {
+function getStatusClassName(
+  status,
+) {
   return status
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, "-");
+    .replace(
+      /\s+/g,
+      "-",
+    );
 }
 
-function getTargetDisplayValue(targetUrl) {
+function getTargetDisplayValue(
+  targetUrl,
+) {
   if (!targetUrl) {
     return "Unknown target";
   }
 
   try {
-    const parsedUrl = new URL(targetUrl);
+    const parsedUrl =
+      new URL(targetUrl);
 
     return `${parsedUrl.hostname}${
       parsedUrl.port
@@ -138,36 +149,71 @@ function getTargetDisplayValue(targetUrl) {
 }
 
 function ScanHistoryPage() {
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
-  const [scans, setScans] = useState([]);
-  const [searchValue, setSearchValue] =
-    useState("");
+  const [scans, setScans] =
+    useState([]);
 
-  const [statusFilter, setStatusFilter] =
-    useState("All statuses");
+  const [
+    searchValue,
+    setSearchValue,
+  ] = useState("");
 
-  const [isLoading, setIsLoading] =
-    useState(true);
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] = useState(
+    "All statuses",
+  );
 
-  const [loadError, setLoadError] =
-    useState("");
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(true);
 
-  const loadScans = useCallback(
-    async () => {
+  const [
+    loadError,
+    setLoadError,
+  ] = useState("");
+
+  const [
+    scanPendingDeletion,
+    setScanPendingDeletion,
+  ] = useState(null);
+
+  const [
+    isDeleting,
+    setIsDeleting,
+  ] = useState(false);
+
+  const [
+    deleteError,
+    setDeleteError,
+  ] = useState("");
+
+  const loadScans =
+    useCallback(async () => {
       try {
         setIsLoading(true);
         setLoadError("");
 
-        const data = await getScans();
+        const data =
+          await getScans();
 
-        if (!Array.isArray(data?.scans)) {
+        if (
+          !Array.isArray(
+            data?.scans,
+          )
+        ) {
           throw new Error(
             "The server did not return a valid scan list.",
           );
         }
 
-        setScans(data.scans);
+        setScans(
+          data.scans,
+        );
       } catch (error) {
         console.error(
           "Unable to load scan history:",
@@ -181,105 +227,230 @@ function ScanHistoryPage() {
       } finally {
         setIsLoading(false);
       }
-    },
-    [],
-  );
+    }, []);
 
   useEffect(() => {
     loadScans();
   }, [loadScans]);
 
-  const filteredScans = useMemo(() => {
-    const normalisedSearch =
-      searchValue
-        .trim()
-        .toLowerCase();
-
-    return scans.filter((scan) => {
-      const status =
-        getScanStatus(scan);
-
-      const formattedDate =
-        formatScanDate(
-          scan.createdAt,
-        );
-
-      const searchableValues = [
-        scan.targetUrl,
-        getTargetDisplayValue(
-          scan.targetUrl,
-        ),
-        formattedDate,
-        scan.browser,
-        status,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      const matchesSearch =
-        normalisedSearch.length === 0 ||
-        searchableValues.includes(
-          normalisedSearch,
-        );
-
-      const matchesStatus =
-        statusFilter ===
-          "All statuses" ||
-        status === statusFilter;
-
-      return (
-        matchesSearch &&
-        matchesStatus
+  useEffect(() => {
+    const modalOpen =
+      Boolean(
+        scanPendingDeletion,
       );
-    });
+
+    document.body.style.overflow =
+      modalOpen
+        ? "hidden"
+        : "";
+
+    function closeWithEscape(
+      event,
+    ) {
+      if (
+        event.key === "Escape" &&
+        !isDeleting
+      ) {
+        setScanPendingDeletion(
+          null,
+        );
+
+        setDeleteError("");
+      }
+    }
+
+    document.addEventListener(
+      "keydown",
+      closeWithEscape,
+    );
+
+    return () => {
+      document.body.style.overflow =
+        "";
+
+      document.removeEventListener(
+        "keydown",
+        closeWithEscape,
+      );
+    };
   }, [
-    scans,
-    searchValue,
-    statusFilter,
+    isDeleting,
+    scanPendingDeletion,
   ]);
 
-  function handleViewScan(scanId) {
+  const filteredScans =
+    useMemo(() => {
+      const normalisedSearch =
+        searchValue
+          .trim()
+          .toLowerCase();
+
+      return scans.filter(
+        (scan) => {
+          const status =
+            getScanStatus(
+              scan,
+            );
+
+          const formattedDate =
+            formatScanDate(
+              scan.createdAt,
+            );
+
+          const searchableValues = [
+            scan.targetUrl,
+            getTargetDisplayValue(
+              scan.targetUrl,
+            ),
+            formattedDate,
+            scan.browser,
+            status,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+
+          const matchesSearch =
+            normalisedSearch.length ===
+              0 ||
+            searchableValues.includes(
+              normalisedSearch,
+            );
+
+          const matchesStatus =
+            statusFilter ===
+              "All statuses" ||
+            status ===
+              statusFilter;
+
+          return (
+            matchesSearch &&
+            matchesStatus
+          );
+        },
+      );
+    }, [
+      scans,
+      searchValue,
+      statusFilter,
+    ]);
+
+  function handleViewScan(
+    scanId,
+  ) {
     navigate(
       `/scan-results?scan=${scanId}`,
     );
   }
 
-  function handleRunAgain(scan) {
-    navigate("/new-scan", {
-      state: {
-        targetUrl:
-          scan.targetUrl ?? "",
+  function handleRunAgain(
+    scan,
+  ) {
+    navigate(
+      "/new-scan",
+      {
+        state: {
+          targetUrl:
+            scan.targetUrl ?? "",
 
-        rejectSelector:
-          scan.rejectSelector ??
-          "#reject-all",
+          rejectSelector:
+            scan.rejectSelector ??
+            "#reject-all",
 
-        browser:
-          scan.browser ??
-          "chromium",
+          browser:
+            scan.browser ??
+            "chromium",
 
-        waitTime:
-          scan.waitTime ??
-          3000,
+          waitTime:
+            scan.waitTime ??
+            3000,
 
-        sourceFolder:
-          scan.sourceCodeFolder ??
-          "./src",
+          sourceFolder:
+            scan.sourceCodeFolder ??
+            "./src",
 
-        necessaryCookieAllowlist:
-          scan.necessaryCookieAllowlist ??
-          [],
+          necessaryCookieAllowlist:
+            scan.necessaryCookieAllowlist ??
+            [],
 
-        scanOptions:
-          scan.scanOptions ?? {
-            cookies: true,
-            networkRequests: true,
-            browserStorage: true,
-            sourceCode: false,
-          },
+          scanOptions:
+            scan.scanOptions ?? {
+              cookies: true,
+              networkRequests: true,
+              browserStorage: true,
+              sourceCode: false,
+            },
+        },
       },
-    });
+    );
+  }
+
+  function openDeleteModal(
+    scan,
+  ) {
+    setDeleteError("");
+
+    setScanPendingDeletion(
+      scan,
+    );
+  }
+
+  function closeDeleteModal() {
+    if (isDeleting) {
+      return;
+    }
+
+    setScanPendingDeletion(
+      null,
+    );
+
+    setDeleteError("");
+  }
+
+  async function confirmDeleteScan() {
+    if (
+      !scanPendingDeletion?._id ||
+      isDeleting
+    ) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      setDeleteError("");
+
+      const deletedScanId =
+        scanPendingDeletion._id;
+
+      await deleteScan(
+        deletedScanId,
+      );
+
+      setScans(
+        (currentScans) =>
+          currentScans.filter(
+            (scan) =>
+              scan._id !==
+              deletedScanId,
+          ),
+      );
+
+      setScanPendingDeletion(
+        null,
+      );
+    } catch (error) {
+      console.error(
+        "Unable to delete scan:",
+        error,
+      );
+
+      setDeleteError(
+        error.message ||
+          "The scan could not be deleted.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   const showEmptyState =
@@ -294,7 +465,9 @@ function ScanHistoryPage() {
     >
       <section className="scan-history-page">
         <header className="scan-history-heading">
-          <h1>Scan History</h1>
+          <h1>
+            Scan History
+          </h1>
 
           <p>
             Review and manage previous scans.
@@ -319,11 +492,14 @@ function ScanHistoryPage() {
                 <input
                   id="scan-history-search"
                   type="search"
-                  value={searchValue}
+                  value={
+                    searchValue
+                  }
                   placeholder="Search target URL or date"
                   onChange={(event) =>
                     setSearchValue(
-                      event.target.value,
+                      event.target
+                        .value,
                     )
                   }
                 />
@@ -334,7 +510,9 @@ function ScanHistoryPage() {
                     type="button"
                     aria-label="Clear search"
                     onClick={() =>
-                      setSearchValue("")
+                      setSearchValue(
+                        "",
+                      )
                     }
                   >
                     ×
@@ -351,10 +529,13 @@ function ScanHistoryPage() {
               <div className="history-select-wrapper">
                 <select
                   id="scan-history-filter"
-                  value={statusFilter}
+                  value={
+                    statusFilter
+                  }
                   onChange={(event) =>
                     setStatusFilter(
-                      event.target.value,
+                      event.target
+                        .value,
                     )
                   }
                 >
@@ -397,11 +578,15 @@ function ScanHistoryPage() {
                 Scan history unavailable
               </h2>
 
-              <p>{loadError}</p>
+              <p>
+                {loadError}
+              </p>
 
               <button
                 type="button"
-                onClick={loadScans}
+                onClick={
+                  loadScans
+                }
               >
                 Try again
               </button>
@@ -452,6 +637,10 @@ function ScanHistoryPage() {
                           getScanIssueCount(
                             scan,
                           );
+
+                        const cannotDelete =
+                          status ===
+                          "Running";
 
                         return (
                           <tr
@@ -527,6 +716,26 @@ function ScanHistoryPage() {
                                 >
                                   Run again
                                 </button>
+
+                                <button
+                                  className="scan-history-delete-button"
+                                  type="button"
+                                  disabled={
+                                    cannotDelete
+                                  }
+                                  title={
+                                    cannotDelete
+                                      ? "Running scans cannot be deleted"
+                                      : "Delete scan"
+                                  }
+                                  onClick={() =>
+                                    openDeleteModal(
+                                      scan,
+                                    )
+                                  }
+                                >
+                                  Delete
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -552,7 +761,8 @@ function ScanHistoryPage() {
                     </h2>
 
                     <p>
-                      {scans.length === 0
+                      {scans.length ===
+                      0
                         ? "Run your first scan to see it here."
                         : "Try changing the search term or status filter."}
                     </p>
@@ -564,15 +774,19 @@ function ScanHistoryPage() {
           <footer className="scan-history-footer">
             <span>
               Showing{" "}
-              {filteredScans.length} of{" "}
-              {scans.length} scans
+              {
+                filteredScans.length
+              }{" "}
+              of {scans.length} scans
             </span>
 
             <button
               className="scan-history-new-scan-button"
               type="button"
               onClick={() =>
-                navigate("/new-scan")
+                navigate(
+                  "/new-scan",
+                )
               }
             >
               New Scan
@@ -580,6 +794,26 @@ function ScanHistoryPage() {
           </footer>
         </section>
       </section>
+
+      {scanPendingDeletion && (
+        <DeleteScanModal
+          scan={
+            scanPendingDeletion
+          }
+          isDeleting={
+            isDeleting
+          }
+          errorMessage={
+            deleteError
+          }
+          onCancel={
+            closeDeleteModal
+          }
+          onConfirm={
+            confirmDeleteScan
+          }
+        />
+      )}
     </DashboardLayout>
   );
 }
