@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import "./DashboardSidebar.css";
 
 const navigationItems = [
@@ -34,6 +35,16 @@ const navigationItems = [
 
 function DashboardSidebar({ activePage }) {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/sign-in", { replace: true });
+    } catch (error) {
+      console.error("Unable to sign out:", error);
+    }
+  };
 
   return (
     <aside className="dashboard-sidebar">
@@ -62,6 +73,20 @@ function DashboardSidebar({ activePage }) {
           </button>
         ))}
       </nav>
+
+      <div className="dashboard-sidebar-account">
+        <div>
+          <strong>
+            {user?.firstName} {user?.lastName}
+          </strong>
+
+          <span>{user?.email}</span>
+        </div>
+
+        <button type="button" onClick={handleLogout}>
+          Sign out
+        </button>
+      </div>
     </aside>
   );
 }

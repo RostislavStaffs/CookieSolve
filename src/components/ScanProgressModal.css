@@ -286,3 +286,39 @@
     transform: none;
   }
 }
+.scan-current-step {
+  margin: 17px 0 0;
+
+  color: #8d9cff;
+
+  font-size: 11px;
+  text-align: center;
+}
+
+.scan-progress-error {
+  margin-top: 18px;
+  padding: 12px 14px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  border: 1px solid rgba(239, 67, 84, 0.25);
+  border-radius: 11px;
+
+  background: rgba(218, 45, 63, 0.1);
+}
+
+.scan-progress-error strong {
+  color: #ff8e99;
+
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scan-progress-error span {
+  color: #c98890;
+
+  font-size: 10px;
+  line-height: 1.45;
+}

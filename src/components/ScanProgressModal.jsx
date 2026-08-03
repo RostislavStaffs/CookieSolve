@@ -1,69 +1,149 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { getScan } from "../services/scanApi";
 import "./ScanProgressModal.css";
 
 const scanSteps = [
-  "Launching clean browser session",
-  "Opening target website",
-  "Capturing pre-consent cookies",
-  "Capturing pre-consent network requests",
-  "Clicking Reject All",
-  "Capturing post-rejection behaviour",
-  "Scanning source code",
-  "Generating Report",
+  {
+    key: "launch",
+    label: "Launching clean browser session",
+    backendSteps: [
+      "Preparing scan",
+      "Launching browser",
+    ],
+  },
+  {
+    key: "open",
+    label: "Opening target website",
+    backendSteps: ["Loading target website"],
+  },
+  {
+    key: "pre-consent",
+    label: "Capturing pre-consent behaviour",
+    backendSteps: ["Capturing pre-consent behaviour"],
+  },
+  {
+    key: "reject",
+    label: "Clicking Reject All",
+    backendSteps: ["Applying reject action"],
+  },
+  {
+    key: "wait",
+    label: "Waiting for post-rejection activity",
+    backendSteps: [
+      "Waiting for post-rejection activity",
+    ],
+  },
+  {
+    key: "post-rejection",
+    label: "Capturing post-rejection behaviour",
+    backendSteps: [
+      "Capturing post-rejection behaviour",
+    ],
+  },
+  {
+    key: "complete",
+    label: "Saving scan results",
+    backendSteps: ["Scan completed"],
+  },
 ];
 
-function getRandomDelay() {
-  return Math.floor(Math.random() * 3000) + 2000;
+function findCurrentStepIndex(currentStep, status) {
+  if (status === "completed") {
+    return scanSteps.length;
+  }
+
+  const matchingIndex = scanSteps.findIndex((step) =>
+    step.backendSteps.includes(currentStep),
+  );
+
+  return matchingIndex >= 0 ? matchingIndex : 0;
 }
 
 function ScanProgressModal({
+  scanId,
   targetUrl,
   onCancel,
   onComplete,
 }) {
-  const [completedSteps, setCompletedSteps] = useState(0);
-  const timeoutRef = useRef(null);
-  const cancelledRef = useRef(false);
+  const [scan, setScan] = useState(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const intervalRef = useRef(null);
+  const completionHandledRef = useRef(false);
+
+  const currentStepIndex = useMemo(
+    () =>
+      findCurrentStepIndex(
+        scan?.currentStep,
+        scan?.status,
+      ),
+    [scan],
+  );
 
   useEffect(() => {
-    cancelledRef.current = false;
+    let componentMounted = true;
 
-    const runNextStep = (stepIndex) => {
-      if (cancelledRef.current) {
-        return;
+    const stopPolling = () => {
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
+    };
 
-      if (stepIndex >= scanSteps.length) {
-        timeoutRef.current = window.setTimeout(() => {
-          onComplete();
-        }, 700);
+    const loadScan = async () => {
+      try {
+        const data = await getScan(scanId);
 
-        return;
-      }
-
-      timeoutRef.current = window.setTimeout(() => {
-        if (cancelledRef.current) {
+        if (!componentMounted) {
           return;
         }
 
-        setCompletedSteps(stepIndex + 1);
-        runNextStep(stepIndex + 1);
-      }, getRandomDelay());
+        setScan(data.scan);
+        setErrorMessage("");
+
+        if (data.scan.status === "completed") {
+          stopPolling();
+
+          if (!completionHandledRef.current) {
+            completionHandledRef.current = true;
+
+            window.setTimeout(() => {
+              onComplete(scanId);
+            }, 700);
+          }
+        }
+
+        if (data.scan.status === "failed") {
+          stopPolling();
+
+          setErrorMessage(
+            data.scan.errorMessage ||
+              "The scan could not be completed.",
+          );
+        }
+      } catch (error) {
+        stopPolling();
+
+        if (componentMounted) {
+          setErrorMessage(
+            error.message ||
+              "Unable to retrieve the scan progress.",
+          );
+        }
+      }
     };
 
-    runNextStep(0);
+    loadScan();
+
+    intervalRef.current = window.setInterval(
+      loadScan,
+      1000,
+    );
 
     return () => {
-      cancelledRef.current = true;
-      window.clearTimeout(timeoutRef.current);
+      componentMounted = false;
+      stopPolling();
     };
-  }, [onComplete]);
-
-  const handleCancel = () => {
-    cancelledRef.current = true;
-    window.clearTimeout(timeoutRef.current);
-    onCancel();
-  };
+  }, [scanId, onComplete]);
 
   return (
     <div
@@ -93,15 +173,20 @@ function ScanProgressModal({
 
           <ol className="scan-progress-list">
             {scanSteps.map((step, index) => {
-              const isComplete = index < completedSteps;
-              const isActive = index === completedSteps;
+              const isComplete =
+                scan?.status === "completed" ||
+                index < currentStepIndex;
+
+              const isActive =
+                scan?.status === "running" &&
+                index === currentStepIndex;
 
               return (
                 <li
                   className={`scan-progress-item ${
                     isComplete ? "complete" : ""
                   } ${isActive ? "active" : ""}`}
-                  key={step}
+                  key={step.key}
                 >
                   <span
                     className="scan-step-status"
@@ -118,19 +203,34 @@ function ScanProgressModal({
                     )}
                   </span>
 
-                  <span>{step}</span>
+                  <span>{step.label}</span>
                 </li>
               );
             })}
           </ol>
         </div>
 
+        {scan?.status === "running" && (
+          <p className="scan-current-step" aria-live="polite">
+            {scan.currentStep}
+          </p>
+        )}
+
+        {errorMessage && (
+          <div className="scan-progress-error" role="alert">
+            <strong>Scan failed</strong>
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         <button
           className="cancel-scan-button"
           type="button"
-          onClick={handleCancel}
+          onClick={onCancel}
         >
-          Cancel Scan
+          {scan?.status === "failed"
+            ? "Close"
+            : "Close Progress"}
         </button>
       </section>
     </div>
