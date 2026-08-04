@@ -116,26 +116,59 @@ async function capturePhaseSnapshot({
   context,
   page,
   networkRequests,
+  scanOptions,
 }) {
-  const cookies = await context.cookies();
+  const cookies =
+    scanOptions.cookies
+      ? sanitiseCookies(
+          await context.cookies(),
+        )
+      : [];
 
   const browserStorage =
-    await captureBrowserStorage(page);
+    scanOptions.browserStorage
+      ? await captureBrowserStorage(page)
+      : [];
 
   return {
-    cookies: sanitiseCookies(cookies),
-    networkRequests: [...networkRequests],
+    cookies,
+    networkRequests:
+      scanOptions.networkRequests
+        ? [...networkRequests]
+        : [],
     browserStorage,
   };
 }
 
 export async function runRuntimeScan({
   targetUrl,
-  rejectSelector,
+  consentAction = "reject",
+  acceptSelector = "#accept-all",
+  rejectSelector = "#reject-all",
   browser = "chromium",
   waitTime = 1500,
+  scanOptions = {},
   onStepChange = async () => {},
 }) {
+  const resolvedScanOptions = {
+    cookies:
+      scanOptions.cookies !== false,
+
+    networkRequests:
+      scanOptions.networkRequests !== false,
+
+    browserStorage:
+      scanOptions.browserStorage !== false,
+
+    sourceCode:
+      scanOptions.sourceCode === true,
+  };
+
+  const selectedSelector =
+    consentAction === "accept"
+      ? acceptSelector
+      : rejectSelector;
+
   const browserLauncher =
     getBrowserLauncher(browser);
 
@@ -161,36 +194,42 @@ export async function runRuntimeScan({
     let activePhase = "pre-consent";
 
     const preConsentRequests = [];
-    const postRejectionRequests = [];
+    const postActionRequests = [];
 
-    page.on("request", (request) => {
-      const requestData = {
-        url: request.url(),
-        method: request.method(),
-        resourceType: request.resourceType(),
-        hostname: getHostname(request.url()),
-        isThirdParty:
-          isThirdPartyRequest(
-            request.url(),
-            targetUrl,
-          ),
-        timestamp: new Date(),
-      };
+    if (
+      resolvedScanOptions.networkRequests
+    ) {
+      page.on("request", (request) => {
+        const requestData = {
+          url: request.url(),
+          method: request.method(),
+          resourceType:
+            request.resourceType(),
+          hostname:
+            getHostname(request.url()),
+          isThirdParty:
+            isThirdPartyRequest(
+              request.url(),
+              targetUrl,
+            ),
+          timestamp: new Date(),
+        };
 
-      if (
-        activePhase === "pre-consent"
-      ) {
-        preConsentRequests.push(
+        if (
+          activePhase === "pre-consent"
+        ) {
+          preConsentRequests.push(
+            requestData,
+          );
+
+          return;
+        }
+
+        postActionRequests.push(
           requestData,
         );
-
-        return;
-      }
-
-      postRejectionRequests.push(
-        requestData,
-      );
-    });
+      });
+    }
 
     await onStepChange(
       "Loading target website",
@@ -217,57 +256,71 @@ export async function runRuntimeScan({
         page,
         networkRequests:
           preConsentRequests,
+        scanOptions:
+          resolvedScanOptions,
       });
 
     await onStepChange(
-      "Locating rejection control",
+      consentAction === "accept"
+        ? "Locating acceptance control"
+        : "Locating rejection control",
     );
 
-    const rejectControl =
-      page.locator(rejectSelector).first();
+    const consentControl =
+      page
+        .locator(selectedSelector)
+        .first();
 
-    await rejectControl.waitFor({
+    await consentControl.waitFor({
       state: "visible",
       timeout: 10000,
     });
 
-    /*
-     * Requests triggered by the rejection
-     * action belong to the post-rejection phase.
-     */
-    activePhase = "post-rejection";
+    activePhase =
+      consentAction === "accept"
+        ? "post-acceptance"
+        : "post-rejection";
 
     await onStepChange(
-      "Rejecting consent",
+      consentAction === "accept"
+        ? "Accepting consent"
+        : "Rejecting consent",
     );
 
-    await rejectControl.click({
+    await consentControl.click({
       timeout: 10000,
     });
 
     await onStepChange(
-      "Waiting for post-rejection activity",
+      consentAction === "accept"
+        ? "Waiting for post-acceptance activity"
+        : "Waiting for post-rejection activity",
     );
 
     await page.waitForTimeout(waitTime);
 
     await onStepChange(
-      "Capturing post-rejection evidence",
+      consentAction === "accept"
+        ? "Capturing post-acceptance evidence"
+        : "Capturing post-rejection evidence",
     );
 
-    const postRejection =
+    const postAction =
       await capturePhaseSnapshot({
         context,
         page,
         networkRequests:
-          postRejectionRequests,
+          postActionRequests,
+        scanOptions:
+          resolvedScanOptions,
       });
 
     await context.close();
 
     return {
+      consentAction,
       preConsent,
-      postRejection,
+      postAction,
     };
   } finally {
     if (browserInstance) {

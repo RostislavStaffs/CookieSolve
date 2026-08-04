@@ -62,29 +62,42 @@ function createStorageIdentifier(item) {
 }
 
 function isConsentStorageKey(key) {
-  const normalisedKey = normalise(key);
+  const normalisedKey =
+    normalise(key);
 
   return DEFAULT_CONSENT_STORAGE_KEYS.some(
     (consentKey) =>
       normalisedKey === consentKey ||
-      normalisedKey.includes(consentKey),
+      normalisedKey.includes(
+        consentKey,
+      ),
   );
 }
 
-function isAllowlistedCookie(cookie, allowlist = []) {
-  const cookieName = normalise(cookie.name);
+function isAllowlistedCookie(
+  cookie,
+  allowlist = [],
+) {
+  const cookieName =
+    normalise(cookie.name);
 
   return allowlist.some(
     (allowedName) =>
-      normalise(allowedName) === cookieName,
+      normalise(allowedName) ===
+      cookieName,
   );
 }
 
-function requestContainsSuspiciousKeyword(request) {
-  const url = normalise(request.url);
+function requestContainsSuspiciousKeyword(
+  request,
+) {
+  const url = normalise(
+    request.url,
+  );
 
   return SUSPICIOUS_REQUEST_KEYWORDS.some(
-    (keyword) => url.includes(keyword),
+    (keyword) =>
+      url.includes(keyword),
   );
 }
 
@@ -93,19 +106,34 @@ function isSuspiciousRequest(request) {
     return true;
   }
 
-  if (requestContainsSuspiciousKeyword(request)) {
+  if (
+    requestContainsSuspiciousKeyword(
+      request,
+    )
+  ) {
     return true;
   }
 
-  const resourceType = normalise(request.resourceType);
+  const resourceType =
+    normalise(
+      request.resourceType,
+    );
 
   if (
-    !IGNORED_RESOURCE_TYPES.has(resourceType) &&
-    ["fetch", "xhr", "websocket", "eventsource", "ping"].includes(
+    !IGNORED_RESOURCE_TYPES.has(
       resourceType,
-    )
+    ) &&
+    [
+      "fetch",
+      "xhr",
+      "websocket",
+      "eventsource",
+      "ping",
+    ].includes(resourceType)
   ) {
-    return requestContainsSuspiciousKeyword(request);
+    return requestContainsSuspiciousKeyword(
+      request,
+    );
   }
 
   return false;
@@ -147,9 +175,11 @@ function analysePreConsentCookies({
       createFinding({
         category: "cookie",
         phase: "pre-consent",
-        type: "cookie-before-consent",
+        type:
+          "cookie-before-consent",
         severity: "high",
-        title: "Cookie created before consent",
+        title:
+          "Cookie created before consent",
         description:
           `The cookie "${cookie.name}" was present before ` +
           "the user made a consent choice.",
@@ -174,14 +204,22 @@ function analysePostRejectionCookies({
 }) {
   const findings = [];
 
-  const preConsentCookieMap = new Map(
-    preConsentCookies.map((cookie) => [
-      createCookieIdentifier(cookie),
-      cookie,
-    ]),
-  );
+  const preConsentCookieMap =
+    new Map(
+      preConsentCookies.map(
+        (cookie) => [
+          createCookieIdentifier(
+            cookie,
+          ),
+          cookie,
+        ],
+      ),
+    );
 
-  for (const cookie of postRejectionCookies) {
+  for (
+    const cookie of
+    postRejectionCookies
+  ) {
     if (
       isAllowlistedCookie(
         cookie,
@@ -191,31 +229,42 @@ function analysePostRejectionCookies({
       continue;
     }
 
-    const identifier = createCookieIdentifier(cookie);
+    const identifier =
+      createCookieIdentifier(
+        cookie,
+      );
+
     const existingCookie =
-      preConsentCookieMap.get(identifier);
+      preConsentCookieMap.get(
+        identifier,
+      );
 
     if (existingCookie) {
       findings.push(
         createFinding({
           category: "cookie",
           phase: "post-rejection",
-          type: "cookie-persisted-after-rejection",
+          type:
+            "cookie-persisted-after-rejection",
           severity: "high",
-          title: "Cookie persisted after rejection",
+          title:
+            "Cookie persisted after rejection",
           description:
             `The cookie "${cookie.name}" existed before consent ` +
             "and remained present after the user rejected consent.",
           evidence: {
             name: cookie.name,
             value: cookie.value,
-            previousValue: existingCookie.value,
+            previousValue:
+              existingCookie.value,
             domain: cookie.domain,
             path: cookie.path,
             expires: cookie.expires,
-            httpOnly: cookie.httpOnly,
+            httpOnly:
+              cookie.httpOnly,
             secure: cookie.secure,
-            sameSite: cookie.sameSite,
+            sameSite:
+              cookie.sameSite,
           },
         }),
       );
@@ -227,9 +276,11 @@ function analysePostRejectionCookies({
       createFinding({
         category: "cookie",
         phase: "post-rejection",
-        type: "cookie-created-after-rejection",
+        type:
+          "cookie-created-after-rejection",
         severity: "high",
-        title: "Cookie created after rejection",
+        title:
+          "Cookie created after rejection",
         description:
           `The cookie "${cookie.name}" was newly created after ` +
           "the user rejected consent.",
@@ -255,15 +306,21 @@ function analysePreConsentStorage(
 ) {
   return preConsentStorage
     .filter(
-      (item) => !isConsentStorageKey(item.key),
+      (item) =>
+        !isConsentStorageKey(
+          item.key,
+        ),
     )
     .map((item) =>
       createFinding({
-        category: "browser-storage",
+        category:
+          "browser-storage",
         phase: "pre-consent",
-        type: "storage-before-consent",
+        type:
+          "storage-before-consent",
         severity: "medium",
-        title: "Browser storage created before consent",
+        title:
+          "Browser storage created before consent",
         description:
           `The ${item.storageType} entry "${item.key}" ` +
           "was present before a consent choice was made.",
@@ -271,7 +328,8 @@ function analysePreConsentStorage(
           origin: item.origin,
           key: item.key,
           value: item.value,
-          storageType: item.storageType,
+          storageType:
+            item.storageType,
         },
       }),
     );
@@ -283,30 +341,49 @@ function analysePostRejectionStorage({
 }) {
   const findings = [];
 
-  const preConsentStorageMap = new Map(
-    preConsentStorage.map((item) => [
-      createStorageIdentifier(item),
-      item,
-    ]),
-  );
+  const preConsentStorageMap =
+    new Map(
+      preConsentStorage.map(
+        (item) => [
+          createStorageIdentifier(
+            item,
+          ),
+          item,
+        ],
+      ),
+    );
 
-  for (const item of postRejectionStorage) {
-    if (isConsentStorageKey(item.key)) {
+  for (
+    const item of
+    postRejectionStorage
+  ) {
+    if (
+      isConsentStorageKey(
+        item.key,
+      )
+    ) {
       continue;
     }
 
     const identifier =
-      createStorageIdentifier(item);
+      createStorageIdentifier(
+        item,
+      );
 
     const existingItem =
-      preConsentStorageMap.get(identifier);
+      preConsentStorageMap.get(
+        identifier,
+      );
 
     if (existingItem) {
       findings.push(
         createFinding({
-          category: "browser-storage",
-          phase: "post-rejection",
-          type: "storage-persisted-after-rejection",
+          category:
+            "browser-storage",
+          phase:
+            "post-rejection",
+          type:
+            "storage-persisted-after-rejection",
           severity: "medium",
           title:
             "Browser storage persisted after rejection",
@@ -317,8 +394,10 @@ function analysePostRejectionStorage({
             origin: item.origin,
             key: item.key,
             value: item.value,
-            previousValue: existingItem.value,
-            storageType: item.storageType,
+            previousValue:
+              existingItem.value,
+            storageType:
+              item.storageType,
           },
         }),
       );
@@ -328,9 +407,11 @@ function analysePostRejectionStorage({
 
     findings.push(
       createFinding({
-        category: "browser-storage",
+        category:
+          "browser-storage",
         phase: "post-rejection",
-        type: "storage-created-after-rejection",
+        type:
+          "storage-created-after-rejection",
         severity: "medium",
         title:
           "Browser storage created after rejection",
@@ -341,7 +422,8 @@ function analysePostRejectionStorage({
           origin: item.origin,
           key: item.key,
           value: item.value,
-          storageType: item.storageType,
+          storageType:
+            item.storageType,
         },
       }),
     );
@@ -366,9 +448,10 @@ function analyseRequests({
         type: beforeConsent
           ? "suspicious-request-before-consent"
           : "suspicious-request-after-rejection",
-        severity: request.isThirdParty
-          ? "high"
-          : "medium",
+        severity:
+          request.isThirdParty
+            ? "high"
+            : "medium",
         title: beforeConsent
           ? "Suspicious request sent before consent"
           : "Suspicious request sent after rejection",
@@ -380,10 +463,14 @@ function analyseRequests({
         evidence: {
           url: request.url,
           method: request.method,
-          resourceType: request.resourceType,
-          hostname: request.hostname,
-          isThirdParty: request.isThirdParty,
-          timestamp: request.timestamp,
+          resourceType:
+            request.resourceType,
+          hostname:
+            request.hostname,
+          isThirdParty:
+            request.isThirdParty,
+          timestamp:
+            request.timestamp,
         },
       });
     });
@@ -398,40 +485,72 @@ function buildSummary(findings) {
     cookies: 0,
     network: 0,
     browserStorage: 0,
+    sourceCode: 0,
     preConsent: 0,
     postRejection: 0,
+    postAcceptance: 0,
   };
 
   for (const finding of findings) {
     if (
-      Object.prototype.hasOwnProperty.call(
-        summary,
-        finding.severity,
-      )
+      Object.prototype
+        .hasOwnProperty.call(
+          summary,
+          finding.severity,
+        )
     ) {
-      summary[finding.severity] += 1;
+      summary[
+        finding.severity
+      ] += 1;
     }
 
-    if (finding.category === "cookie") {
+    if (
+      finding.category ===
+      "cookie"
+    ) {
       summary.cookies += 1;
     }
 
-    if (finding.category === "network") {
+    if (
+      finding.category ===
+      "network"
+    ) {
       summary.network += 1;
     }
 
     if (
-      finding.category === "browser-storage"
+      finding.category ===
+      "browser-storage"
     ) {
       summary.browserStorage += 1;
     }
 
-    if (finding.phase === "pre-consent") {
+    if (
+      finding.category ===
+      "source-code"
+    ) {
+      summary.sourceCode += 1;
+    }
+
+    if (
+      finding.phase ===
+      "pre-consent"
+    ) {
       summary.preConsent += 1;
     }
 
-    if (finding.phase === "post-rejection") {
+    if (
+      finding.phase ===
+      "post-rejection"
+    ) {
       summary.postRejection += 1;
+    }
+
+    if (
+      finding.phase ===
+      "post-acceptance"
+    ) {
+      summary.postAcceptance += 1;
     }
   }
 
@@ -440,66 +559,160 @@ function buildSummary(findings) {
 
 export function analyseRuntimeFindings({
   preConsent,
-  postRejection,
+  postAction,
+  consentAction = "reject",
   necessaryCookieAllowlist = [],
+  scanOptions = {},
 }) {
+  const resolvedScanOptions = {
+    cookies:
+      scanOptions.cookies !== false,
+
+    networkRequests:
+      scanOptions.networkRequests !== false,
+
+    browserStorage:
+      scanOptions.browserStorage !== false,
+
+    sourceCode:
+      scanOptions.sourceCode === true,
+  };
+
   const safePreConsent = {
-    cookies: preConsent?.cookies ?? [],
+    cookies:
+      preConsent?.cookies ?? [],
+
     networkRequests:
-      preConsent?.networkRequests ?? [],
+      preConsent
+        ?.networkRequests ?? [],
+
     browserStorage:
-      preConsent?.browserStorage ?? [],
+      preConsent
+        ?.browserStorage ?? [],
   };
 
-  const safePostRejection = {
-    cookies: postRejection?.cookies ?? [],
+  const safePostAction = {
+    cookies:
+      postAction?.cookies ?? [],
+
     networkRequests:
-      postRejection?.networkRequests ?? [],
+      postAction
+        ?.networkRequests ?? [],
+
     browserStorage:
-      postRejection?.browserStorage ?? [],
+      postAction
+        ?.browserStorage ?? [],
   };
 
-  const findings = [
-    ...analysePreConsentCookies({
-      preConsentCookies:
-        safePreConsent.cookies,
-      necessaryCookieAllowlist,
-    }),
+  const findings = [];
 
-    ...analysePostRejectionCookies({
-      preConsentCookies:
-        safePreConsent.cookies,
-      postRejectionCookies:
-        safePostRejection.cookies,
-      necessaryCookieAllowlist,
-    }),
+  /*
+   * Pre-consent activity is relevant for both
+   * Accept All and Reject All scans.
+   */
+  if (
+    resolvedScanOptions.cookies
+  ) {
+    findings.push(
+      ...analysePreConsentCookies({
+        preConsentCookies:
+          safePreConsent.cookies,
 
-    ...analysePreConsentStorage(
-      safePreConsent.browserStorage,
-    ),
+        necessaryCookieAllowlist,
+      }),
+    );
+  }
 
-    ...analysePostRejectionStorage({
-      preConsentStorage:
-        safePreConsent.browserStorage,
-      postRejectionStorage:
-        safePostRejection.browserStorage,
-    }),
+  if (
+    resolvedScanOptions
+      .browserStorage
+  ) {
+    findings.push(
+      ...analysePreConsentStorage(
+        safePreConsent
+          .browserStorage,
+      ),
+    );
+  }
 
-    ...analyseRequests({
-      requests:
-        safePreConsent.networkRequests,
-      phase: "pre-consent",
-    }),
+  if (
+    resolvedScanOptions
+      .networkRequests
+  ) {
+    findings.push(
+      ...analyseRequests({
+        requests:
+          safePreConsent
+            .networkRequests,
 
-    ...analyseRequests({
-      requests:
-        safePostRejection.networkRequests,
-      phase: "post-rejection",
-    }),
-  ];
+        phase: "pre-consent",
+      }),
+    );
+  }
+
+  /*
+   * Activity after acceptance is expected and
+   * must not be labelled as a rejection violation.
+   *
+   * Post-action violation analysis therefore only
+   * applies when Reject All was selected.
+   */
+  if (
+    consentAction === "reject"
+  ) {
+    if (
+      resolvedScanOptions.cookies
+    ) {
+      findings.push(
+        ...analysePostRejectionCookies({
+          preConsentCookies:
+            safePreConsent.cookies,
+
+          postRejectionCookies:
+            safePostAction.cookies,
+
+          necessaryCookieAllowlist,
+        }),
+      );
+    }
+
+    if (
+      resolvedScanOptions
+        .browserStorage
+    ) {
+      findings.push(
+        ...analysePostRejectionStorage({
+          preConsentStorage:
+            safePreConsent
+              .browserStorage,
+
+          postRejectionStorage:
+            safePostAction
+              .browserStorage,
+        }),
+      );
+    }
+
+    if (
+      resolvedScanOptions
+        .networkRequests
+    ) {
+      findings.push(
+        ...analyseRequests({
+          requests:
+            safePostAction
+              .networkRequests,
+
+          phase:
+            "post-rejection",
+        }),
+      );
+    }
+  }
 
   return {
     findings,
-    summary: buildSummary(findings),
+    summary:
+      buildSummary(findings),
   };
 }
