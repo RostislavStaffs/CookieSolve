@@ -75,17 +75,28 @@ function validateTargetUrl(targetUrl) {
   }
 }
 
+function createEmptyRuntimePhase() {
+  return {
+    cookies: [],
+    networkRequests: [],
+    browserStorage: [],
+  };
+}
+
 function createLegacySummary({
   preConsent,
-  postRejection,
+  postAction,
   findingsSummary,
+  consentAction,
 }) {
   return {
     cookiesBeforeConsent:
       preConsent.cookies.length,
 
     cookiesAfterRejection:
-      postRejection.cookies.length,
+      consentAction === "reject"
+        ? postAction.cookies.length
+        : 0,
 
     thirdPartyRequestsBeforeConsent:
       preConsent.networkRequests.filter(
@@ -94,10 +105,12 @@ function createLegacySummary({
       ).length,
 
     thirdPartyRequestsAfterRejection:
-      postRejection.networkRequests.filter(
-        (request) =>
-          request.isThirdParty,
-      ).length,
+      consentAction === "reject"
+        ? postAction.networkRequests.filter(
+            (request) =>
+              request.isThirdParty,
+          ).length
+        : 0,
 
     issuesDetected:
       findingsSummary.total,
@@ -121,10 +134,6 @@ async function executeScan(scanId) {
     const scan =
       await Scan.findById(scanId);
 
-    /*
-     * The scan may have been deleted before
-     * asynchronous processing started.
-     */
     if (!scan) {
       return;
     }
@@ -142,6 +151,12 @@ async function executeScan(scanId) {
         targetUrl:
           scan.targetUrl,
 
+        consentAction:
+          scan.consentAction,
+
+        acceptSelector:
+          scan.acceptSelector,
+
         rejectSelector:
           scan.rejectSelector,
 
@@ -150,6 +165,9 @@ async function executeScan(scanId) {
 
         waitTime:
           scan.waitTime,
+
+        scanOptions:
+          scan.scanOptions,
 
         onStepChange: async (
           currentStep,
@@ -161,11 +179,6 @@ async function executeScan(scanId) {
         },
       });
 
-    /*
-     * A scan cannot normally be deleted while
-     * running, but this check keeps the async
-     * workflow safe if the record disappears.
-     */
     const scanStillExists =
       await Scan.exists({
         _id: scan._id,
@@ -185,18 +198,33 @@ async function executeScan(scanId) {
         preConsent:
           runtimeResult.preConsent,
 
-        postRejection:
-          runtimeResult.postRejection,
+        postAction:
+          runtimeResult.postAction,
+
+        consentAction:
+          scan.consentAction,
 
         necessaryCookieAllowlist:
           scan.necessaryCookieAllowlist,
+
+        scanOptions:
+          scan.scanOptions,
       });
 
     scan.preConsent =
       runtimeResult.preConsent;
 
+    scan.postAction =
+      runtimeResult.postAction;
+
+    /*
+     * Keep this compatibility field populated
+     * only for Reject All scans.
+     */
     scan.postRejection =
-      runtimeResult.postRejection;
+      scan.consentAction === "reject"
+        ? runtimeResult.postAction
+        : createEmptyRuntimePhase();
 
     scan.findings =
       analysis.findings;
@@ -204,20 +232,19 @@ async function executeScan(scanId) {
     scan.findingsSummary =
       analysis.summary;
 
-    /*
-     * Kept temporarily for compatibility
-     * with older stored scans and UI code.
-     */
     scan.summary =
       createLegacySummary({
         preConsent:
           runtimeResult.preConsent,
 
-        postRejection:
-          runtimeResult.postRejection,
+        postAction:
+          runtimeResult.postAction,
 
         findingsSummary:
           analysis.summary,
+
+        consentAction:
+          scan.consentAction,
       });
 
     scan.status = "completed";
@@ -233,20 +260,31 @@ async function executeScan(scanId) {
       error,
     );
 
-    await Scan.findByIdAndUpdate(
-      scanId,
-      {
-        status: "failed",
-        currentStep: "Scan failed",
+    /*
+     * The record may have been deleted while the
+     * asynchronous scan was still executing.
+     */
+    try {
+      await Scan.findByIdAndUpdate(
+        scanId,
+        {
+          status: "failed",
+          currentStep: "Scan failed",
 
-        errorMessage:
-          error instanceof Error
-            ? error.message
-            : "The runtime scan failed.",
+          errorMessage:
+            error instanceof Error
+              ? error.message
+              : "The runtime scan failed.",
 
-        completedAt: new Date(),
-      },
-    );
+          completedAt: new Date(),
+        },
+      );
+    } catch (updateError) {
+      console.error(
+        "Unable to save scan failure:",
+        updateError,
+      );
+    }
   }
 }
 
@@ -271,7 +309,9 @@ export async function createScan(
 
     const {
       targetUrl,
-      rejectSelector,
+      consentAction = "reject",
+      acceptSelector = "#accept-all",
+      rejectSelector = "#reject-all",
       browser = "chromium",
       waitTime = 1500,
       sourceCodeFolder = "",
@@ -293,15 +333,38 @@ export async function createScan(
     }
 
     if (
-      !rejectSelector ||
-      typeof rejectSelector !==
-        "string"
+      ![
+        "accept",
+        "reject",
+      ].includes(
+        consentAction,
+      )
     ) {
       return response
         .status(400)
         .json({
           message:
-            "A reject-button CSS selector is required.",
+            "Select either Accept All or Reject All.",
+        });
+    }
+
+    const selectedSelector =
+      consentAction === "accept"
+        ? acceptSelector
+        : rejectSelector;
+
+    if (
+      typeof selectedSelector !==
+        "string" ||
+      !selectedSelector.trim()
+    ) {
+      return response
+        .status(400)
+        .json({
+          message:
+            consentAction === "accept"
+              ? "An Accept All button selector is required."
+              : "A Reject All button selector is required.",
         });
     }
 
@@ -342,6 +405,46 @@ export async function createScan(
         });
     }
 
+    const resolvedScanOptions = {
+      cookies:
+        parseBoolean(
+          scanOptions.cookies,
+          true,
+        ),
+
+      networkRequests:
+        parseBoolean(
+          scanOptions.networkRequests,
+          true,
+        ),
+
+      browserStorage:
+        parseBoolean(
+          scanOptions.browserStorage,
+          true,
+        ),
+
+      sourceCode:
+        parseBoolean(
+          scanOptions.sourceCode,
+          false,
+        ),
+    };
+
+    if (
+      !resolvedScanOptions.cookies &&
+      !resolvedScanOptions.networkRequests &&
+      !resolvedScanOptions.browserStorage &&
+      !resolvedScanOptions.sourceCode
+    ) {
+      return response
+        .status(400)
+        .json({
+          message:
+            "Select at least one scan option.",
+        });
+    }
+
     const necessaryCookieAllowlist =
       parseAllowlist(
         request.body
@@ -355,8 +458,17 @@ export async function createScan(
         targetUrl:
           targetUrl.trim(),
 
+        consentAction,
+
+        acceptSelector:
+          String(
+            acceptSelector,
+          ).trim(),
+
         rejectSelector:
-          rejectSelector.trim(),
+          String(
+            rejectSelector,
+          ).trim(),
 
         browser,
 
@@ -370,31 +482,8 @@ export async function createScan(
             sourceCodeFolder,
           ).trim(),
 
-        scanOptions: {
-          cookies:
-            parseBoolean(
-              scanOptions.cookies,
-              true,
-            ),
-
-          networkRequests:
-            parseBoolean(
-              scanOptions.networkRequests,
-              true,
-            ),
-
-          browserStorage:
-            parseBoolean(
-              scanOptions.browserStorage,
-              true,
-            ),
-
-          sourceCode:
-            parseBoolean(
-              scanOptions.sourceCode,
-              false,
-            ),
-        },
+        scanOptions:
+          resolvedScanOptions,
 
         status: "pending",
 
@@ -402,10 +491,6 @@ export async function createScan(
           "Waiting to start",
       });
 
-    /*
-     * Start asynchronously so the frontend
-     * can receive the scan ID immediately.
-     */
     void executeScan(
       scan._id,
     );
@@ -442,6 +527,15 @@ export async function getScan(
       getAuthenticatedUserId(
         request,
       );
+
+    if (!userId) {
+      return response
+        .status(401)
+        .json({
+          message:
+            "Authentication is required.",
+        });
+    }
 
     const { scanId } =
       request.params;
@@ -503,6 +597,15 @@ export async function getScans(
       getAuthenticatedUserId(
         request,
       );
+
+    if (!userId) {
+      return response
+        .status(401)
+        .json({
+          message:
+            "Authentication is required.",
+        });
+    }
 
     const scans =
       await Scan.find({
