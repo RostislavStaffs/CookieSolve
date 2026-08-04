@@ -348,3 +348,28 @@
 .scan-status-failed {
   color: #ff7b89;
 }
+.scan-result-details {
+  margin-top: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 18px;
+
+  color: #8d8c95;
+
+  font-size: 12px;
+}
+
+.scan-result-details strong {
+  color: #c9c8cf;
+  font-weight: 500;
+}
+
+@media (max-width: 560px) {
+  .scan-result-details {
+    flex-direction: column;
+    gap: 5px;
+  }
+}

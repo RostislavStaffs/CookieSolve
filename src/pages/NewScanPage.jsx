@@ -5,7 +5,10 @@ import {
   useState,
 } from "react";
 
-import { useNavigate } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 
 import DashboardLayout from "../components/DashboardLayout";
 import ScanProgressModal from "../components/ScanProgressModal";
@@ -54,10 +57,24 @@ const defaultScanSettings = {
 
 function NewScanPage() {
   const navigate = useNavigate();
-  const allowlistRef = useRef(null);
+  const location = useLocation();
 
-  const [targetUrl, setTargetUrl] =
-    useState("http://localhost:3000");
+  const allowlistRef = useRef(null);
+  const routerStateAppliedRef = useRef(false);
+
+  const [targetUrl, setTargetUrl] = useState(
+    "http://localhost:3000",
+  );
+
+  const [
+    consentAction,
+    setConsentAction,
+  ] = useState("reject");
+
+  const [
+    acceptSelector,
+    setAcceptSelector,
+  ] = useState("#accept-all");
 
   const [
     rejectSelector,
@@ -77,17 +94,12 @@ function NewScanPage() {
     defaultScanSettings.waitTime,
   );
 
-  const [
-    consentAction,
-    setConsentAction,
-  ] = useState("reject");
-
   const [scanOptions, setScanOptions] =
     useState({
       checkCookies: true,
       checkNetworkRequests: true,
       checkStorage: true,
-      scanSourceCode: true,
+      scanSourceCode: false,
     });
 
   const [isSubmitting, setIsSubmitting] =
@@ -125,6 +137,9 @@ function NewScanPage() {
     "csrf_token",
   ]);
 
+  /*
+   * Load locally saved default settings.
+   */
   useEffect(() => {
     const savedSettings =
       window.localStorage.getItem(
@@ -139,7 +154,15 @@ function NewScanPage() {
       const parsedSettings =
         JSON.parse(savedSettings);
 
-      if (parsedSettings.browser) {
+      if (
+        [
+          "chromium",
+          "firefox",
+          "webkit",
+        ].includes(
+          parsedSettings.browser,
+        )
+      ) {
         setBrowser(
           parsedSettings.browser,
         );
@@ -160,16 +183,178 @@ function NewScanPage() {
       }
 
       if (
-        parsedSettings.sourceFolder
+        typeof parsedSettings.sourceFolder ===
+          "string" &&
+        parsedSettings.sourceFolder.trim()
       ) {
         setSourceFolder(
           parsedSettings.sourceFolder,
         );
       }
     } catch {
-      // Invalid saved settings are ignored.
+      // Invalid local settings are ignored.
     }
   }, []);
+
+  /*
+   * Apply settings supplied through Run Again
+   * from Scan History or Scan Results.
+   */
+  useEffect(() => {
+    if (
+      routerStateAppliedRef.current ||
+      !location.state
+    ) {
+      return;
+    }
+
+    routerStateAppliedRef.current = true;
+
+    const previousScan =
+      location.state;
+
+    if (
+      typeof previousScan.targetUrl ===
+        "string" &&
+      previousScan.targetUrl.trim()
+    ) {
+      setTargetUrl(
+        previousScan.targetUrl,
+      );
+    }
+
+    if (
+      previousScan.consentAction ===
+        "accept" ||
+      previousScan.consentAction ===
+        "reject"
+    ) {
+      setConsentAction(
+        previousScan.consentAction,
+      );
+    }
+
+    if (
+      typeof previousScan.acceptSelector ===
+        "string" &&
+      previousScan.acceptSelector.trim()
+    ) {
+      setAcceptSelector(
+        previousScan.acceptSelector,
+      );
+    }
+
+    if (
+      typeof previousScan.rejectSelector ===
+        "string" &&
+      previousScan.rejectSelector.trim()
+    ) {
+      setRejectSelector(
+        previousScan.rejectSelector,
+      );
+    }
+
+    if (
+      [
+        "chromium",
+        "firefox",
+        "webkit",
+      ].includes(
+        previousScan.browser,
+      )
+    ) {
+      setBrowser(
+        previousScan.browser,
+      );
+    }
+
+    if (
+      Number.isFinite(
+        Number(
+          previousScan.waitTime,
+        ),
+      )
+    ) {
+      setWaitTime(
+        Number(
+          previousScan.waitTime,
+        ),
+      );
+    }
+
+    if (
+      typeof previousScan.sourceFolder ===
+      "string"
+    ) {
+      setSourceFolder(
+        previousScan.sourceFolder,
+      );
+    }
+
+    if (
+      Array.isArray(
+        previousScan.necessaryCookieAllowlist,
+      )
+    ) {
+      setSelectedCookies(
+        previousScan
+          .necessaryCookieAllowlist
+          .map((cookie) =>
+            String(cookie).trim(),
+          )
+          .filter(Boolean),
+      );
+    }
+
+    if (
+      previousScan.scanOptions &&
+      typeof previousScan.scanOptions ===
+        "object"
+    ) {
+      setScanOptions({
+        checkCookies:
+          previousScan.scanOptions
+            .cookies ??
+          previousScan.scanOptions
+            .checkCookies ??
+          true,
+
+        checkNetworkRequests:
+          previousScan.scanOptions
+            .networkRequests ??
+          previousScan.scanOptions
+            .checkNetworkRequests ??
+          true,
+
+        checkStorage:
+          previousScan.scanOptions
+            .browserStorage ??
+          previousScan.scanOptions
+            .checkStorage ??
+          true,
+
+        scanSourceCode:
+          previousScan.scanOptions
+            .sourceCode ??
+          previousScan.scanOptions
+            .scanSourceCode ??
+          false,
+      });
+    }
+
+    /*
+     * Clear the consumed router state so it
+     * is not applied again after refresh.
+     */
+    navigate(location.pathname, {
+      replace: true,
+      state: null,
+    });
+  }, [
+    location.pathname,
+    location.state,
+    navigate,
+  ]);
 
   useEffect(() => {
     function closeDropdown(event) {
@@ -302,6 +487,8 @@ function NewScanPage() {
         [name]: checked,
       }),
     );
+
+    setErrorMessage("");
   }
 
   async function handleRunScan(event) {
@@ -310,8 +497,22 @@ function NewScanPage() {
     const cleanedTargetUrl =
       targetUrl.trim();
 
+    const cleanedAcceptSelector =
+      acceptSelector.trim();
+
     const cleanedRejectSelector =
       rejectSelector.trim();
+
+    const selectedConsentSelector =
+      consentAction === "accept"
+        ? cleanedAcceptSelector
+        : cleanedRejectSelector;
+
+    const atLeastOneOptionSelected =
+      scanOptions.checkCookies ||
+      scanOptions.checkNetworkRequests ||
+      scanOptions.checkStorage ||
+      scanOptions.scanSourceCode;
 
     if (!cleanedTargetUrl) {
       setErrorMessage(
@@ -321,12 +522,19 @@ function NewScanPage() {
       return;
     }
 
-    if (
-      consentAction === "reject" &&
-      !cleanedRejectSelector
-    ) {
+    if (!selectedConsentSelector) {
       setErrorMessage(
-        "Enter the CSS selector for the Reject All button.",
+        consentAction === "accept"
+          ? "Enter the CSS selector for the Accept All button."
+          : "Enter the CSS selector for the Reject All button.",
+      );
+
+      return;
+    }
+
+    if (!atLeastOneOptionSelected) {
+      setErrorMessage(
+        "Select at least one scan option.",
       );
 
       return;
@@ -337,7 +545,13 @@ function NewScanPage() {
 
     try {
       const data = await startScan({
-        targetUrl: cleanedTargetUrl,
+        targetUrl:
+          cleanedTargetUrl,
+
+        consentAction,
+
+        acceptSelector:
+          cleanedAcceptSelector,
 
         rejectSelector:
           cleanedRejectSelector,
@@ -358,7 +572,8 @@ function NewScanPage() {
             scanOptions.checkCookies,
 
           networkRequests:
-            scanOptions.checkNetworkRequests,
+            scanOptions
+              .checkNetworkRequests,
 
           browserStorage:
             scanOptions.checkStorage,
@@ -469,11 +684,13 @@ function NewScanPage() {
                   consentAction ===
                   "accept"
                 }
-                onChange={(event) =>
+                onChange={(event) => {
                   setConsentAction(
                     event.target.value,
-                  )
-                }
+                  );
+
+                  setErrorMessage("");
+                }}
               />
 
               <span
@@ -481,7 +698,9 @@ function NewScanPage() {
                 aria-hidden="true"
               />
 
-              <span>Accept all</span>
+              <span>
+                Accept all
+              </span>
             </label>
 
             <label className="scan-radio-option">
@@ -493,11 +712,13 @@ function NewScanPage() {
                   consentAction ===
                   "reject"
                 }
-                onChange={(event) =>
+                onChange={(event) => {
                   setConsentAction(
                     event.target.value,
-                  )
-                }
+                  );
+
+                  setErrorMessage("");
+                }}
               />
 
               <span
@@ -505,32 +726,56 @@ function NewScanPage() {
                 aria-hidden="true"
               />
 
-              <span>Reject all</span>
+              <span>
+                Reject all
+              </span>
             </label>
           </fieldset>
 
           <div className="scan-field">
-            <label htmlFor="reject-selector">
-              Reject Button Selector
+            <label htmlFor="consent-button-selector">
+              {consentAction === "accept"
+                ? "Accept Button Selector"
+                : "Reject Button Selector"}
             </label>
 
             <input
-              id="reject-selector"
-              name="rejectSelector"
+              id="consent-button-selector"
+              name="consentButtonSelector"
               type="text"
-              value={rejectSelector}
-              placeholder="#reject-all"
+              value={
+                consentAction === "accept"
+                  ? acceptSelector
+                  : rejectSelector
+              }
+              placeholder={
+                consentAction === "accept"
+                  ? "#accept-all"
+                  : "#reject-all"
+              }
               onChange={(event) => {
-                setRejectSelector(
-                  event.target.value,
-                );
+                if (
+                  consentAction === "accept"
+                ) {
+                  setAcceptSelector(
+                    event.target.value,
+                  );
+                } else {
+                  setRejectSelector(
+                    event.target.value,
+                  );
+                }
 
                 setErrorMessage("");
               }}
             />
 
             <small className="scan-field-help">
-              Enter the CSS selector used to identify the website’s Reject All button.
+              Enter the CSS selector used to identify the website’s{" "}
+              {consentAction === "accept"
+                ? "Accept All"
+                : "Reject All"}{" "}
+              button.
             </small>
           </div>
 
@@ -545,12 +790,19 @@ function NewScanPage() {
               type="text"
               value={sourceFolder}
               placeholder="./src"
+              disabled={
+                !scanOptions.scanSourceCode
+              }
               onChange={(event) =>
                 setSourceFolder(
                   event.target.value,
                 )
               }
             />
+
+            <small className="scan-field-help">
+              This folder is only used when source-code scanning is enabled.
+            </small>
           </div>
 
           <div
@@ -575,6 +827,9 @@ function NewScanPage() {
               aria-haspopup="listbox"
               aria-expanded={
                 isAllowlistOpen
+              }
+              disabled={
+                !scanOptions.checkCookies
               }
               onClick={() =>
                 setIsAllowlistOpen(
@@ -655,148 +910,149 @@ function NewScanPage() {
               />
             </button>
 
-            {isAllowlistOpen && (
-              <div className="cookie-allowlist-menu">
-                <div className="allowlist-search-wrapper">
-                  <svg
-                    className="allowlist-search-icon"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
+            {isAllowlistOpen &&
+              scanOptions.checkCookies && (
+                <div className="cookie-allowlist-menu">
+                  <div className="allowlist-search-wrapper">
+                    <svg
+                      className="allowlist-search-icon"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" />
+                    </svg>
+
+                    <input
+                      type="text"
+                      value={
+                        allowlistSearch
+                      }
+                      placeholder="Search or add a cookie"
+                      aria-label="Search or add a necessary cookie"
+                      onChange={(event) =>
+                        setAllowlistSearch(
+                          event.target
+                            .value,
+                        )
+                      }
+                      onKeyDown={
+                        handleSearchKeyDown
+                      }
+                    />
+                  </div>
+
+                  <div
+                    className="cookie-option-list"
+                    role="listbox"
+                    aria-multiselectable="true"
                   >
-                    <path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" />
-                  </svg>
+                    {filteredCookieOptions.map(
+                      (cookie) => {
+                        const isSelected =
+                          selectedCookies.includes(
+                            cookie.name,
+                          );
 
-                  <input
-                    type="text"
-                    value={
-                      allowlistSearch
-                    }
-                    placeholder="Search or add a cookie"
-                    aria-label="Search or add a necessary cookie"
-                    onChange={(event) =>
-                      setAllowlistSearch(
-                        event.target
-                          .value,
-                      )
-                    }
-                    onKeyDown={
-                      handleSearchKeyDown
-                    }
-                  />
-                </div>
+                        return (
+                          <button
+                            className={[
+                              "cookie-option",
+                              isSelected
+                                ? "selected"
+                                : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            type="button"
+                            role="option"
+                            aria-selected={
+                              isSelected
+                            }
+                            key={
+                              cookie.name
+                            }
+                            onClick={() =>
+                              toggleCookie(
+                                cookie.name,
+                              )
+                            }
+                          >
+                            <span className="cookie-option-check">
+                              {isSelected && (
+                                <svg
+                                  viewBox="0 0 16 16"
+                                  aria-hidden="true"
+                                >
+                                  <path d="m3 8.2 3 3L13 4.8" />
+                                </svg>
+                              )}
+                            </span>
 
-                <div
-                  className="cookie-option-list"
-                  role="listbox"
-                  aria-multiselectable="true"
-                >
-                  {filteredCookieOptions.map(
-                    (cookie) => {
-                      const isSelected =
-                        selectedCookies.includes(
-                          cookie.name,
+                            <span className="cookie-option-text">
+                              <strong>
+                                {
+                                  cookie.name
+                                }
+                              </strong>
+
+                              <small>
+                                {
+                                  cookie.description
+                                }
+                              </small>
+                            </span>
+                          </button>
                         );
+                      },
+                    )}
 
-                      return (
+                    {filteredCookieOptions.length ===
+                      0 &&
+                      allowlistSearch.trim() && (
                         <button
-                          className={[
-                            "cookie-option",
-                            isSelected
-                              ? "selected"
-                              : "",
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
+                          className="add-custom-cookie-button"
                           type="button"
-                          role="option"
-                          aria-selected={
-                            isSelected
-                          }
-                          key={
-                            cookie.name
-                          }
-                          onClick={() =>
-                            toggleCookie(
-                              cookie.name,
-                            )
+                          onClick={
+                            addCustomCookie
                           }
                         >
-                          <span className="cookie-option-check">
-                            {isSelected && (
-                              <svg
-                                viewBox="0 0 16 16"
-                                aria-hidden="true"
-                              >
-                                <path d="m3 8.2 3 3L13 4.8" />
-                              </svg>
-                            )}
+                          <span className="add-custom-cookie-icon">
+                            +
                           </span>
 
-                          <span className="cookie-option-text">
+                          <span>
+                            Add{" "}
                             <strong>
-                              {
-                                cookie.name
-                              }
+                              “
+                              {allowlistSearch.trim()}
+                              ”
                             </strong>
-
-                            <small>
-                              {
-                                cookie.description
-                              }
-                            </small>
                           </span>
                         </button>
-                      );
-                    },
-                  )}
+                      )}
+                  </div>
 
-                  {filteredCookieOptions.length ===
-                    0 &&
-                    allowlistSearch.trim() && (
-                      <button
-                        className="add-custom-cookie-button"
-                        type="button"
-                        onClick={
-                          addCustomCookie
-                        }
-                      >
-                        <span className="add-custom-cookie-icon">
-                          +
-                        </span>
+                  <div className="allowlist-menu-footer">
+                    <span>
+                      {
+                        selectedCookies.length
+                      }{" "}
+                      selected
+                    </span>
 
-                        <span>
-                          Add{" "}
-                          <strong>
-                            “
-                            {allowlistSearch.trim()}
-                            ”
-                          </strong>
-                        </span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedCookies(
+                          [],
+                        )
+                      }
+                    >
+                      Clear all
+                    </button>
+                  </div>
                 </div>
-
-                <div className="allowlist-menu-footer">
-                  <span>
-                    {
-                      selectedCookies.length
-                    }{" "}
-                    selected
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSelectedCookies(
-                        [],
-                      )
-                    }
-                  >
-                    Clear all
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
           </div>
 
           <fieldset className="scan-option-group scan-options-group">
@@ -831,7 +1087,8 @@ function NewScanPage() {
                 type="checkbox"
                 name="checkNetworkRequests"
                 checked={
-                  scanOptions.checkNetworkRequests
+                  scanOptions
+                    .checkNetworkRequests
                 }
                 onChange={
                   updateScanOption
@@ -875,7 +1132,8 @@ function NewScanPage() {
                 type="checkbox"
                 name="scanSourceCode"
                 checked={
-                  scanOptions.scanSourceCode
+                  scanOptions
+                    .scanSourceCode
                 }
                 onChange={
                   updateScanOption

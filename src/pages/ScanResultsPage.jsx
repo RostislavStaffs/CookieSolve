@@ -1,8 +1,15 @@
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import {
   useNavigate,
   useSearchParams,
 } from "react-router-dom";
+
 import DashboardLayout from "../components/DashboardLayout";
 import ScanSummaryModal from "../components/ScanSummaryModal";
 import CookieFindingsModal from "../components/CookieFindingsModal";
@@ -10,61 +17,264 @@ import NetworkFindingsModal from "../components/NetworkFindingsModal";
 import SourceCodeFindingsModal from "../components/SourceCodeFindingsModal";
 import BrowserStorageFindingsModal from "../components/BrowserStorageFindingsModal";
 import FixGuidanceModal from "../components/FixGuidanceModal";
+
 import { getScan } from "../services/scanApi";
+
 import "./ScanResultsPage.css";
 
-const resultTabs = [
-  "Summary",
-  "Cookies",
-  "Network",
-  "Storage",
-  "Source code",
-  "Fix guidance",
-];
+function buildFallbackSummary(findings) {
+  const summary = {
+    total: findings.length,
+    high: 0,
+    medium: 0,
+    low: 0,
+    cookies: 0,
+    network: 0,
+    browserStorage: 0,
+    sourceCode: 0,
+    preConsent: 0,
+    postRejection: 0,
+    postAcceptance: 0,
+  };
+
+  for (const finding of findings) {
+    if (
+      Object.prototype.hasOwnProperty.call(
+        summary,
+        finding.severity,
+      )
+    ) {
+      summary[finding.severity] += 1;
+    }
+
+    if (finding.category === "cookie") {
+      summary.cookies += 1;
+    }
+
+    if (finding.category === "network") {
+      summary.network += 1;
+    }
+
+    if (
+      finding.category ===
+      "browser-storage"
+    ) {
+      summary.browserStorage += 1;
+    }
+
+    if (
+      finding.category ===
+      "source-code"
+    ) {
+      summary.sourceCode += 1;
+    }
+
+    if (
+      finding.phase ===
+      "pre-consent"
+    ) {
+      summary.preConsent += 1;
+    }
+
+    if (
+      finding.phase ===
+      "post-rejection"
+    ) {
+      summary.postRejection += 1;
+    }
+
+    if (
+      finding.phase ===
+      "post-acceptance"
+    ) {
+      summary.postAcceptance += 1;
+    }
+  }
+
+  return summary;
+}
+
+function getOverallStatus(
+  scan,
+  findingsSummary,
+) {
+  if (scan?.status === "failed") {
+    return "FAILED";
+  }
+
+  if (
+    scan?.status === "pending" ||
+    scan?.status === "running"
+  ) {
+    return "RUNNING";
+  }
+
+  if (
+    (findingsSummary.high ?? 0) > 0
+  ) {
+    return "WARNING";
+  }
+
+  if (
+    (findingsSummary.medium ?? 0) > 0 ||
+    (findingsSummary.low ?? 0) > 0
+  ) {
+    return "WARNING";
+  }
+
+  return "PASSED";
+}
+
+function getConsentActionLabel(
+  consentAction,
+) {
+  return consentAction === "accept"
+    ? "Accept All"
+    : "Reject All";
+}
 
 function ScanResultsPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams] =
+    useSearchParams();
 
-  const scanId = searchParams.get("scan");
+  const scanId =
+    searchParams.get("scan");
 
-  const [scan, setScan] = useState(null);
-  const [isLoading, setIsLoading] = useState(Boolean(scanId));
-  const [loadError, setLoadError] = useState("");
+  const [scan, setScan] =
+    useState(null);
 
-  const [activeTab, setActiveTab] = useState(null);
-  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
-  const [isCookiesOpen, setIsCookiesOpen] = useState(false);
-  const [isNetworkOpen, setIsNetworkOpen] = useState(false);
-  const [isStorageOpen, setIsStorageOpen] = useState(false);
-  const [isSourceCodeOpen, setIsSourceCodeOpen] =
-    useState(false);
-  const [isFixGuidanceOpen, setIsFixGuidanceOpen] =
-    useState(false);
+  const [isLoading, setIsLoading] =
+    useState(Boolean(scanId));
+
+  const [loadError, setLoadError] =
+    useState("");
+
+  const [
+    activeModal,
+    setActiveModal,
+  ] = useState(null);
+
+  const [
+    selectedFinding,
+    setSelectedFinding,
+  ] = useState(null);
+
+  const findings = useMemo(
+    () =>
+      Array.isArray(scan?.findings)
+        ? scan.findings
+        : [],
+    [scan?.findings],
+  );
+
+  const findingsSummary =
+    useMemo(() => {
+      const fallbackSummary =
+        buildFallbackSummary(findings);
+
+      return {
+        ...fallbackSummary,
+        ...(scan?.findingsSummary ??
+          {}),
+      };
+    }, [
+      findings,
+      scan?.findingsSummary,
+    ]);
+
+  const enabledResultTabs =
+    useMemo(() => {
+      const options =
+        scan?.scanOptions ?? {};
+
+      const tabs = [
+        "Summary",
+      ];
+
+      if (
+        options.cookies !== false
+      ) {
+        tabs.push(
+          "Cookies",
+        );
+      }
+
+      if (
+        options.networkRequests !==
+        false
+      ) {
+        tabs.push(
+          "Network",
+        );
+      }
+
+      if (
+        options.browserStorage !==
+        false
+      ) {
+        tabs.push(
+          "Storage",
+        );
+      }
+
+      if (
+        options.sourceCode === true
+      ) {
+        tabs.push(
+          "Source code",
+        );
+      }
+
+      if (
+        findings.length > 0
+      ) {
+        tabs.push(
+          "Fix guidance",
+        );
+      }
+
+      return tabs;
+    }, [
+      findings.length,
+      scan?.scanOptions,
+    ]);
+
+  const overallStatus =
+    getOverallStatus(
+      scan,
+      findingsSummary,
+    );
 
   const isModalOpen =
-    isSummaryOpen ||
-    isCookiesOpen ||
-    isNetworkOpen ||
-    isStorageOpen ||
-    isSourceCodeOpen ||
-    isFixGuidanceOpen;
+    Boolean(activeModal);
 
   useEffect(() => {
     if (!scanId) {
       setIsLoading(false);
-      setLoadError("No scan ID was provided.");
-      return;
+
+      setLoadError(
+        "No scan ID was provided.",
+      );
+
+      return undefined;
     }
 
     let componentMounted = true;
 
-    const loadScan = async () => {
+    async function loadScan() {
       try {
-        const data = await getScan(scanId);
+        const data =
+          await getScan(scanId);
 
         if (!componentMounted) {
           return;
+        }
+
+        if (!data?.scan) {
+          throw new Error(
+            "The server did not return the scan results.",
+          );
         }
 
         setScan(data.scan);
@@ -75,14 +285,15 @@ function ScanResultsPage() {
         }
 
         setLoadError(
-          error.message || "Unable to load the scan results.",
+          error.message ||
+            "Unable to load the scan results.",
         );
       } finally {
         if (componentMounted) {
           setIsLoading(false);
         }
       }
-    };
+    }
 
     loadScan();
 
@@ -91,118 +302,117 @@ function ScanResultsPage() {
     };
   }, [scanId]);
 
-  const closeAllModals = () => {
-    setIsSummaryOpen(false);
-    setIsCookiesOpen(false);
-    setIsNetworkOpen(false);
-    setIsStorageOpen(false);
-    setIsSourceCodeOpen(false);
-    setIsFixGuidanceOpen(false);
-  };
+  const closeAllModals =
+    useCallback(() => {
+      setActiveModal(null);
+      setSelectedFinding(null);
+    }, []);
 
   useEffect(() => {
-    document.body.style.overflow = isModalOpen ? "hidden" : "";
+    document.body.style.overflow =
+      isModalOpen
+        ? "hidden"
+        : "";
 
-    const closeWithEscape = (event) => {
+    function closeWithEscape(event) {
       if (event.key === "Escape") {
         closeAllModals();
       }
-    };
+    }
 
-    document.addEventListener("keydown", closeWithEscape);
+    document.addEventListener(
+      "keydown",
+      closeWithEscape,
+    );
 
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow =
+        "";
+
       document.removeEventListener(
         "keydown",
         closeWithEscape,
       );
     };
-  }, [isModalOpen]);
+  }, [
+    closeAllModals,
+    isModalOpen,
+  ]);
 
-  const openSummary = () => {
-    closeAllModals();
-    setActiveTab("Summary");
-    setIsSummaryOpen(true);
-  };
+  function openModal(modalName) {
+    if (
+      !enabledResultTabs.includes(
+        modalName,
+      )
+    ) {
+      return;
+    }
 
-  const openCookieFindings = () => {
-    closeAllModals();
-    setActiveTab("Cookies");
-    setIsCookiesOpen(true);
-  };
+    setSelectedFinding(null);
+    setActiveModal(modalName);
+  }
 
-  const openNetworkFindings = () => {
-    closeAllModals();
-    setActiveTab("Network");
-    setIsNetworkOpen(true);
-  };
+  function openFindingGuidance(
+    finding,
+  ) {
+    setSelectedFinding(finding);
+    setActiveModal(
+      "Fix guidance",
+    );
+  }
 
-  const openStorageFindings = () => {
-    closeAllModals();
-    setActiveTab("Storage");
-    setIsStorageOpen(true);
-  };
-
-  const openSourceCodeFindings = () => {
-    closeAllModals();
-    setActiveTab("Source code");
-    setIsSourceCodeOpen(true);
-  };
-
-  const openFixGuidance = () => {
-    closeAllModals();
-    setActiveTab("Fix guidance");
-    setIsFixGuidanceOpen(true);
-  };
-
-  const openTab = (tab) => {
-    const tabActions = {
-      Summary: openSummary,
-      Cookies: openCookieFindings,
-      Network: openNetworkFindings,
-      Storage: openStorageFindings,
-      "Source code": openSourceCodeFindings,
-      "Fix guidance": openFixGuidance,
-    };
-
-    tabActions[tab]?.();
-  };
-
-  const summary = scan?.summary || {
-    cookiesBeforeConsent: 0,
-    cookiesAfterRejection: 0,
-    thirdPartyRequestsBeforeConsent: 0,
-    thirdPartyRequestsAfterRejection: 0,
-    issuesDetected: 0,
-  };
-
-  const issuesDetected = summary.issuesDetected || 0;
-
-  const overallStatus =
-    scan?.status === "failed"
-      ? "FAILED"
-      : issuesDetected > 0
-        ? "WARNING"
-        : "PASSED";
-
-  const highCount =
-    summary.thirdPartyRequestsBeforeConsent || 0;
-
-  const mediumCount =
-    (summary.cookiesBeforeConsent || 0) +
-    (summary.cookiesAfterRejection || 0);
-
-  const lowCount =
-    summary.thirdPartyRequestsAfterRejection || 0;
-
-  const handleRunAgain = () => {
+  function handleRunAgain() {
     navigate("/new-scan", {
       state: {
-        targetUrl: scan?.targetUrl,
+        targetUrl:
+          scan?.targetUrl ?? "",
+
+        consentAction:
+          scan?.consentAction ??
+          "reject",
+
+        acceptSelector:
+          scan?.acceptSelector ??
+          "#accept-all",
+
+        rejectSelector:
+          scan?.rejectSelector ??
+          "#reject-all",
+
+        browser:
+          scan?.browser ??
+          "chromium",
+
+        waitTime:
+          scan?.waitTime ??
+          3000,
+
+        sourceFolder:
+          scan?.sourceCodeFolder ??
+          "./src",
+
+        necessaryCookieAllowlist:
+          scan
+            ?.necessaryCookieAllowlist ??
+          [],
+
+        scanOptions:
+          scan?.scanOptions ?? {
+            cookies: true,
+            networkRequests: true,
+            browserStorage: true,
+            sourceCode: false,
+          },
       },
     });
-  };
+  }
+
+  function handleExportReport() {
+    console.log(
+      "Export report for scan:",
+      scan?._id,
+    );
+  }
 
   if (isLoading) {
     return (
@@ -211,12 +421,17 @@ function ScanResultsPage() {
         title="New Scan"
       >
         <section className="scan-results-page">
-          <h1>Scan Results</h1>
+          <h1>
+            Scan Results
+          </h1>
 
           <article className="scan-results-card">
             <div className="scan-results-loading">
               <span className="scan-loading-ring" />
-              <p>Loading scan results...</p>
+
+              <p>
+                Loading scan results...
+              </p>
             </div>
           </article>
         </section>
@@ -231,16 +446,27 @@ function ScanResultsPage() {
         title="New Scan"
       >
         <section className="scan-results-page">
-          <h1>Scan Results</h1>
+          <h1>
+            Scan Results
+          </h1>
 
           <article className="scan-results-card">
             <div className="scan-results-error">
-              <h2>Results unavailable</h2>
-              <p>{loadError}</p>
+              <h2>
+                Results unavailable
+              </h2>
+
+              <p>
+                {loadError}
+              </p>
 
               <button
                 type="button"
-                onClick={() => navigate("/scan-history")}
+                onClick={() =>
+                  navigate(
+                    "/scan-history",
+                  )
+                }
               >
                 Return to Scan History
               </button>
@@ -252,19 +478,29 @@ function ScanResultsPage() {
   }
 
   return (
-    <DashboardLayout activePage="New Scan" title="New Scan">
+    <DashboardLayout
+      activePage="New Scan"
+      title="New Scan"
+    >
       <section className="scan-results-page">
-        <h1>Scan Results</h1>
+        <h1>
+          Scan Results
+        </h1>
 
         <article className="scan-results-card">
-          <h2>Scan Results</h2>
+          <h2>
+            Scan Results
+          </h2>
 
           <div className="scan-result-url">
-            {scan?.targetUrl || "Unknown target"}
+            {scan?.targetUrl ||
+              "Unknown target"}
           </div>
 
           <div className="scan-overall-status">
-            <span>Overall Status:</span>
+            <span>
+              Overall Status:
+            </span>
 
             <strong
               className={`scan-status-${overallStatus.toLowerCase()}`}
@@ -274,141 +510,217 @@ function ScanResultsPage() {
           </div>
 
           <div className="scan-severity-summary">
-            <span>High: {highCount}</span>
-            <span>Medium: {mediumCount}</span>
-            <span>Low: {lowCount}</span>
+            <span>
+              High:{" "}
+              {findingsSummary.high ??
+                0}
+            </span>
+
+            <span>
+              Medium:{" "}
+              {findingsSummary.medium ??
+                0}
+            </span>
+
+            <span>
+              Low:{" "}
+              {findingsSummary.low ??
+                0}
+            </span>
+          </div>
+
+          <div className="scan-result-details">
+            <span>
+              Consent action:{" "}
+              <strong>
+                {getConsentActionLabel(
+                  scan?.consentAction,
+                )}
+              </strong>
+            </span>
+
+            <span>
+              Findings:{" "}
+              <strong>
+                {findingsSummary.total ??
+                  findings.length}
+              </strong>
+            </span>
           </div>
 
           <div className="scan-result-actions">
             <button
               type="button"
-              onClick={handleRunAgain}
+              onClick={
+                handleRunAgain
+              }
             >
               Run again
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                console.log(
-                  "Export report for scan:",
-                  scan?._id,
-                );
-              }}
+              onClick={
+                handleExportReport
+              }
             >
               Export Report
             </button>
 
             <button
               type="button"
-              onClick={() => navigate("/new-scan")}
+              onClick={() =>
+                navigate(
+                  "/new-scan",
+                )
+              }
             >
               New Scan
             </button>
           </div>
 
           <section className="scan-tabs-section">
-            <h3>Tabs:</h3>
+            <h3>
+              Tabs:
+            </h3>
 
             <div
               className="scan-result-tabs"
               role="tablist"
               aria-label="Scan result categories"
             >
-              {resultTabs.map((tab) => (
-                <button
-                  className={
-                    activeTab === tab
-                      ? "scan-result-tab active"
-                      : "scan-result-tab"
-                  }
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tab}
-                  key={tab}
-                  onClick={() => openTab(tab)}
-                >
-                  {tab}
-                </button>
-              ))}
+              {enabledResultTabs.map(
+                (tab) => (
+                  <button
+                    className={
+                      activeModal ===
+                      tab
+                        ? "scan-result-tab active"
+                        : "scan-result-tab"
+                    }
+                    type="button"
+                    role="tab"
+                    aria-selected={
+                      activeModal ===
+                      tab
+                    }
+                    key={tab}
+                    onClick={() =>
+                      openModal(tab)
+                    }
+                  >
+                    {tab}
+                  </button>
+                ),
+              )}
             </div>
           </section>
         </article>
       </section>
 
-      {isSummaryOpen && (
+      {activeModal ===
+        "Summary" && (
         <ScanSummaryModal
           scan={scan}
-          onClose={closeAllModals}
-          onViewCookies={openCookieFindings}
-          onViewNetwork={openNetworkFindings}
-          onViewSourceCode={openSourceCodeFindings}
+          findings={findings}
+          findingsSummary={
+            findingsSummary
+          }
+          overallStatus={
+            overallStatus
+          }
+          onClose={
+            closeAllModals
+          }
+          onViewCookies={() =>
+            openModal(
+              "Cookies",
+            )
+          }
+          onViewNetwork={() =>
+            openModal(
+              "Network",
+            )
+          }
+          onViewSourceCode={() =>
+            openModal(
+              "Source code",
+            )
+          }
         />
       )}
 
-      {isCookiesOpen && (
+      {activeModal ===
+        "Cookies" && (
         <CookieFindingsModal
           scan={scan}
-          onClose={closeAllModals}
-          onViewFinding={(finding) => {
-            console.log(
-              "Selected cookie finding:",
-              finding,
-            );
-          }}
+          findings={findings}
+          onClose={
+            closeAllModals
+          }
+          onViewFinding={
+            openFindingGuidance
+          }
         />
       )}
 
-      {isNetworkOpen && (
+      {activeModal ===
+        "Network" && (
         <NetworkFindingsModal
-          scan={scan}
-          onClose={closeAllModals}
-          onViewFinding={(finding) => {
-            console.log(
-              "Selected network finding:",
-              finding,
-            );
-          }}
+          findings={findings}
+          onClose={
+            closeAllModals
+          }
+          onViewFinding={
+            openFindingGuidance
+          }
         />
       )}
 
-      {isStorageOpen && (
+      {activeModal ===
+        "Storage" && (
         <BrowserStorageFindingsModal
-          scan={scan}
-          onClose={closeAllModals}
-          onViewFinding={(finding) => {
-            console.log(
-              "Selected storage finding:",
-              finding,
-            );
-          }}
+          findings={findings}
+          onClose={
+            closeAllModals
+          }
+          onViewFinding={
+            openFindingGuidance
+          }
         />
       )}
 
-      {isSourceCodeOpen && (
+      {activeModal ===
+        "Source code" && (
         <SourceCodeFindingsModal
           scan={scan}
-          onClose={closeAllModals}
-          onViewFinding={(finding) => {
-            console.log(
-              "Selected source-code finding:",
-              finding,
-            );
-          }}
+          findings={findings}
+          onClose={
+            closeAllModals
+          }
+          onViewFinding={
+            openFindingGuidance
+          }
         />
       )}
 
-      {isFixGuidanceOpen && (
+      {activeModal ===
+        "Fix guidance" && (
         <FixGuidanceModal
           scan={scan}
-          onClose={closeAllModals}
-          onRunAgain={handleRunAgain}
-          onExportResults={() => {
-            console.log(
-              "Export results selected:",
-              scan?._id,
-            );
-          }}
+          finding={
+            selectedFinding
+          }
+          findings={findings}
+          onClose={
+            closeAllModals
+          }
+          onRunAgain={
+            handleRunAgain
+          }
+          onExportResults={
+            handleExportReport
+          }
         />
       )}
     </DashboardLayout>
