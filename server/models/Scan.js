@@ -140,59 +140,65 @@ const runtimePhaseSchema =
     },
   );
 
-const findingSchema = new mongoose.Schema(
-  {
-    category: {
-      type: String,
-      enum: [
-        "cookie",
-        "network",
-        "browser-storage",
-        "source-code",
-      ],
-      required: true,
-    },
+const findingSchema =
+  new mongoose.Schema(
+    {
+      category: {
+        type: String,
+        enum: [
+          "cookie",
+          "network",
+          "browser-storage",
+          "source-code",
+        ],
+        required: true,
+      },
 
-    phase: {
-      type: String,
-      enum: [
-        "pre-consent",
-        "post-rejection",
-        "source-analysis",
-      ],
-      required: true,
-    },
+      phase: {
+        type: String,
+        enum: [
+          "pre-consent",
+          "post-rejection",
+          "post-acceptance",
+          "source-analysis",
+        ],
+        required: true,
+      },
 
-    type: {
-      type: String,
-      required: true,
-    },
+      type: {
+        type: String,
+        required: true,
+      },
 
-    severity: {
-      type: String,
-      enum: ["high", "medium", "low"],
-      required: true,
-    },
+      severity: {
+        type: String,
+        enum: [
+          "high",
+          "medium",
+          "low",
+        ],
+        required: true,
+      },
 
-    title: {
-      type: String,
-      required: true,
-    },
+      title: {
+        type: String,
+        required: true,
+      },
 
-    description: {
-      type: String,
-      required: true,
-    },
+      description: {
+        type: String,
+        required: true,
+      },
 
-    evidence: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {},
+      evidence: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {},
+      },
     },
-  },
-  {
-    timestamps: true,
-  },
-);
+    {
+      timestamps: true,
+    },
+  );
 
 const findingsSummarySchema =
   new mongoose.Schema(
@@ -232,12 +238,22 @@ const findingsSummarySchema =
         default: 0,
       },
 
+      sourceCode: {
+        type: Number,
+        default: 0,
+      },
+
       preConsent: {
         type: Number,
         default: 0,
       },
 
       postRejection: {
+        type: Number,
+        default: 0,
+      },
+
+      postAcceptance: {
         type: Number,
         default: 0,
       },
@@ -295,9 +311,21 @@ const scanSchema = new mongoose.Schema(
       trim: true,
     },
 
+    consentAction: {
+      type: String,
+      enum: ["accept", "reject"],
+      default: "reject",
+    },
+
+    acceptSelector: {
+      type: String,
+      default: "#accept-all",
+      trim: true,
+    },
+
     rejectSelector: {
       type: String,
-      required: true,
+      default: "#reject-all",
       trim: true,
     },
 
@@ -378,6 +406,15 @@ const scanSchema = new mongoose.Schema(
       default: () => ({}),
     },
 
+    postAction: {
+      type: runtimePhaseSchema,
+      default: () => ({}),
+    },
+
+    /*
+     * Retained for compatibility with existing
+     * records and frontend code.
+     */
     postRejection: {
       type: runtimePhaseSchema,
       default: () => ({}),
@@ -393,10 +430,6 @@ const scanSchema = new mongoose.Schema(
       default: () => ({}),
     },
 
-    /*
-     * Kept temporarily so existing frontend code
-     * does not break while we migrate it.
-     */
     summary: {
       type: legacySummarySchema,
       default: () => ({}),
