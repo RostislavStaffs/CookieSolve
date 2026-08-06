@@ -860,3 +860,19 @@
     text-align: left;
   }
 }
+/* Necessary browser-storage allowlist */
+
+#storage-allowlist {
+  letter-spacing: 0;
+}
+
+#storage-allowlist:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  #storage-allowlist {
+    font-size: 14px;
+  }
+}

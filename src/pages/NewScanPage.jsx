@@ -13,7 +13,9 @@ import {
 
 import DashboardLayout from "../components/DashboardLayout";
 import ScanProgressModal from "../components/ScanProgressModal";
-import { startScan } from "../services/scanApi";
+import {
+  startScan,
+} from "../services/scanApi";
 
 import "./NewScanPage.css";
 
@@ -87,17 +89,24 @@ function getScanMode({
 }
 
 function NewScanPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate =
+    useNavigate();
 
-  const allowlistRef = useRef(null);
+  const location =
+    useLocation();
+
+  const allowlistRef =
+    useRef(null);
+
   const routerStateAppliedRef =
     useRef(false);
 
-  const [targetUrl, setTargetUrl] =
-    useState(
-      "http://localhost:3000",
-    );
+  const [
+    targetUrl,
+    setTargetUrl,
+  ] = useState(
+    "http://localhost:3000",
+  );
 
   const [
     consentAction,
@@ -107,36 +116,48 @@ function NewScanPage() {
   const [
     acceptSelector,
     setAcceptSelector,
-  ] = useState("#accept-all");
+  ] = useState(
+    "#accept-all",
+  );
 
   const [
     rejectSelector,
     setRejectSelector,
-  ] = useState("#reject-all");
+  ] = useState(
+    "#reject-all",
+  );
 
   const [
     sourceFolder,
     setSourceFolder,
   ] = useState(
-    defaultScanSettings.sourceFolder,
+    defaultScanSettings
+      .sourceFolder,
   );
 
-  const [browser, setBrowser] =
-    useState(
-      defaultScanSettings.browser,
-    );
+  const [
+    browser,
+    setBrowser,
+  ] = useState(
+    defaultScanSettings
+      .browser,
+  );
 
-  const [waitTime, setWaitTime] =
-    useState(
-      defaultScanSettings.waitTime,
-    );
+  const [
+    waitTime,
+    setWaitTime,
+  ] = useState(
+    defaultScanSettings
+      .waitTime,
+  );
 
   const [
     scanOptions,
     setScanOptions,
   ] = useState({
     checkCookies: true,
-    checkNetworkRequests: true,
+    checkNetworkRequests:
+      true,
     checkStorage: true,
     scanSourceCode: false,
   });
@@ -184,25 +205,34 @@ function NewScanPage() {
     "csrf_token",
   ]);
 
+  const [
+    necessaryStorageAllowlist,
+    setNecessaryStorageAllowlist,
+  ] = useState(
+    "site_consent",
+  );
+
   const hasRuntimeChecks =
     scanOptions.checkCookies ||
-    scanOptions.checkNetworkRequests ||
+    scanOptions
+      .checkNetworkRequests ||
     scanOptions.checkStorage;
 
   const hasSourceCodeCheck =
     scanOptions.scanSourceCode;
 
-  const scanMode = useMemo(
-    () =>
-      getScanMode({
+  const scanMode =
+    useMemo(
+      () =>
+        getScanMode({
+          hasRuntimeChecks,
+          hasSourceCodeCheck,
+        }),
+      [
         hasRuntimeChecks,
         hasSourceCodeCheck,
-      }),
-    [
-      hasRuntimeChecks,
-      hasSourceCodeCheck,
-    ],
-  );
+      ],
+    );
 
   useEffect(() => {
     const savedSettings =
@@ -216,7 +246,9 @@ function NewScanPage() {
 
     try {
       const parsedSettings =
-        JSON.parse(savedSettings);
+        JSON.parse(
+          savedSettings,
+        );
 
       if (
         [
@@ -228,87 +260,110 @@ function NewScanPage() {
         )
       ) {
         setBrowser(
-          parsedSettings.browser,
+          parsedSettings
+            .browser,
         );
       }
 
       if (
         Number.isFinite(
           Number(
-            parsedSettings.waitTime,
+            parsedSettings
+              .waitTime,
           ),
         )
       ) {
         setWaitTime(
           Number(
-            parsedSettings.waitTime,
+            parsedSettings
+              .waitTime,
           ),
         );
       }
 
       if (
-        typeof parsedSettings.sourceFolder ===
+        typeof parsedSettings
+          .sourceFolder ===
         "string"
       ) {
         setSourceFolder(
-          parsedSettings.sourceFolder,
+          parsedSettings
+            .sourceFolder,
         );
       }
     } catch {
-      // Invalid saved settings are ignored.
+      /*
+       * Invalid settings are
+       * safely ignored.
+       */
     }
   }, []);
 
   useEffect(() => {
     if (
-      routerStateAppliedRef.current ||
+      routerStateAppliedRef
+        .current ||
       !location.state
     ) {
       return;
     }
 
-    routerStateAppliedRef.current = true;
+    routerStateAppliedRef
+      .current = true;
 
     const previousScan =
       location.state;
 
     if (
-      typeof previousScan.targetUrl ===
+      typeof previousScan
+        .targetUrl ===
       "string"
     ) {
       setTargetUrl(
-        previousScan.targetUrl,
+        previousScan
+          .targetUrl,
       );
     }
 
     if (
-      previousScan.consentAction ===
+      previousScan
+        .consentAction ===
         "accept" ||
-      previousScan.consentAction ===
+      previousScan
+        .consentAction ===
         "reject"
     ) {
       setConsentAction(
-        previousScan.consentAction,
+        previousScan
+          .consentAction,
       );
     }
 
     if (
-      typeof previousScan.acceptSelector ===
+      typeof previousScan
+        .acceptSelector ===
         "string" &&
-      previousScan.acceptSelector.trim()
+      previousScan
+        .acceptSelector
+        .trim()
     ) {
       setAcceptSelector(
-        previousScan.acceptSelector,
+        previousScan
+          .acceptSelector,
       );
     }
 
     if (
-      typeof previousScan.rejectSelector ===
+      typeof previousScan
+        .rejectSelector ===
         "string" &&
-      previousScan.rejectSelector.trim()
+      previousScan
+        .rejectSelector
+        .trim()
     ) {
       setRejectSelector(
-        previousScan.rejectSelector,
+        previousScan
+          .rejectSelector,
       );
     }
 
@@ -329,23 +384,27 @@ function NewScanPage() {
     if (
       Number.isFinite(
         Number(
-          previousScan.waitTime,
+          previousScan
+            .waitTime,
         ),
       )
     ) {
       setWaitTime(
         Number(
-          previousScan.waitTime,
+          previousScan
+            .waitTime,
         ),
       );
     }
 
     if (
-      typeof previousScan.sourceFolder ===
+      typeof previousScan
+        .sourceFolder ===
       "string"
     ) {
       setSourceFolder(
-        previousScan.sourceFolder,
+        previousScan
+          .sourceFolder,
       );
     }
 
@@ -359,52 +418,84 @@ function NewScanPage() {
         previousScan
           .necessaryCookieAllowlist
           .map((cookie) =>
-            String(cookie).trim(),
+            String(cookie)
+              .trim(),
           )
           .filter(Boolean),
       );
     }
 
     if (
-      previousScan.scanOptions &&
-      typeof previousScan.scanOptions ===
+      Array.isArray(
+        previousScan
+          .necessaryStorageAllowlist,
+      )
+    ) {
+      setNecessaryStorageAllowlist(
+        previousScan
+          .necessaryStorageAllowlist
+          .map((item) =>
+            String(item)
+              .trim(),
+          )
+          .filter(Boolean)
+          .join(", "),
+      );
+    }
+
+    if (
+      previousScan
+        .scanOptions &&
+      typeof previousScan
+        .scanOptions ===
         "object"
     ) {
       setScanOptions({
         checkCookies:
-          previousScan.scanOptions
+          previousScan
+            .scanOptions
             .cookies ??
-          previousScan.scanOptions
+          previousScan
+            .scanOptions
             .checkCookies ??
           true,
 
         checkNetworkRequests:
-          previousScan.scanOptions
+          previousScan
+            .scanOptions
             .networkRequests ??
-          previousScan.scanOptions
+          previousScan
+            .scanOptions
             .checkNetworkRequests ??
           true,
 
         checkStorage:
-          previousScan.scanOptions
+          previousScan
+            .scanOptions
             .browserStorage ??
-          previousScan.scanOptions
+          previousScan
+            .scanOptions
             .checkStorage ??
           true,
 
         scanSourceCode:
-          previousScan.scanOptions
+          previousScan
+            .scanOptions
             .sourceCode ??
-          previousScan.scanOptions
+          previousScan
+            .scanOptions
             .scanSourceCode ??
           false,
       });
     }
 
-    navigate(location.pathname, {
-      replace: true,
-      state: null,
-    });
+    navigate(
+      location.pathname,
+      {
+        replace: true,
+        state: null,
+      },
+    );
   }, [
     location.pathname,
     location.state,
@@ -412,20 +503,29 @@ function NewScanPage() {
   ]);
 
   useEffect(() => {
-    if (!hasRuntimeChecks) {
-      setIsAllowlistOpen(false);
+    if (
+      !hasRuntimeChecks
+    ) {
+      setIsAllowlistOpen(
+        false,
+      );
     }
   }, [hasRuntimeChecks]);
 
   useEffect(() => {
-    function closeDropdown(event) {
+    function closeDropdown(
+      event,
+    ) {
       if (
         allowlistRef.current &&
-        !allowlistRef.current.contains(
-          event.target,
-        )
+        !allowlistRef.current
+          .contains(
+            event.target,
+          )
       ) {
-        setIsAllowlistOpen(false);
+        setIsAllowlistOpen(
+          false,
+        );
       }
     }
 
@@ -443,19 +543,21 @@ function NewScanPage() {
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow =
+    document.body.style
+      .overflow =
       isScanRunning
         ? "hidden"
         : "";
 
     return () => {
-      document.body.style.overflow = "";
+      document.body.style
+        .overflow = "";
     };
   }, [isScanRunning]);
 
   const filteredCookieOptions =
-    necessaryCookieOptions.filter(
-      (cookie) => {
+    necessaryCookieOptions
+      .filter((cookie) => {
         const searchValue =
           allowlistSearch
             .trim()
@@ -464,15 +566,20 @@ function NewScanPage() {
         return (
           cookie.name
             .toLowerCase()
-            .includes(searchValue) ||
+            .includes(
+              searchValue,
+            ) ||
           cookie.description
             .toLowerCase()
-            .includes(searchValue)
+            .includes(
+              searchValue,
+            )
         );
-      },
-    );
+      });
 
-  function toggleCookie(cookieName) {
+  function toggleCookie(
+    cookieName,
+  ) {
     setSelectedCookies(
       (currentCookies) => {
         if (
@@ -480,10 +587,12 @@ function NewScanPage() {
             cookieName,
           )
         ) {
-          return currentCookies.filter(
-            (cookie) =>
-              cookie !== cookieName,
-          );
+          return currentCookies
+            .filter(
+              (cookie) =>
+                cookie !==
+                cookieName,
+            );
         }
 
         return [
@@ -494,12 +603,15 @@ function NewScanPage() {
     );
   }
 
-  function removeCookie(cookieName) {
+  function removeCookie(
+    cookieName,
+  ) {
     setSelectedCookies(
       (currentCookies) =>
         currentCookies.filter(
           (cookie) =>
-            cookie !== cookieName,
+            cookie !==
+            cookieName,
         ),
     );
   }
@@ -527,20 +639,32 @@ function NewScanPage() {
     setAllowlistSearch("");
   }
 
-  function handleSearchKeyDown(event) {
-    if (event.key === "Enter") {
+  function handleSearchKeyDown(
+    event,
+  ) {
+    if (
+      event.key === "Enter"
+    ) {
       event.preventDefault();
       addCustomCookie();
     }
 
-    if (event.key === "Escape") {
-      setIsAllowlistOpen(false);
+    if (
+      event.key === "Escape"
+    ) {
+      setIsAllowlistOpen(
+        false,
+      );
     }
   }
 
-  function updateScanOption(event) {
-    const { name, checked } =
-      event.target;
+  function updateScanOption(
+    event,
+  ) {
+    const {
+      name,
+      checked,
+    } = event.target;
 
     setScanOptions(
       (currentOptions) => ({
@@ -552,7 +676,9 @@ function NewScanPage() {
     setErrorMessage("");
   }
 
-  async function handleRunScan(event) {
+  async function handleRunScan(
+    event,
+  ) {
     event.preventDefault();
 
     const cleanedTargetUrl =
@@ -567,8 +693,17 @@ function NewScanPage() {
     const cleanedSourceFolder =
       sourceFolder.trim();
 
+    const parsedStorageAllowlist =
+      necessaryStorageAllowlist
+        .split(",")
+        .map((item) =>
+          item.trim(),
+        )
+        .filter(Boolean);
+
     const selectedConsentSelector =
-      consentAction === "accept"
+      consentAction ===
+      "accept"
         ? cleanedAcceptSelector
         : cleanedRejectSelector;
 
@@ -576,7 +711,9 @@ function NewScanPage() {
       hasRuntimeChecks ||
       hasSourceCodeCheck;
 
-    if (!atLeastOneOptionSelected) {
+    if (
+      !atLeastOneOptionSelected
+    ) {
       setErrorMessage(
         "Select at least one scan option.",
       );
@@ -600,7 +737,8 @@ function NewScanPage() {
       !selectedConsentSelector
     ) {
       setErrorMessage(
-        consentAction === "accept"
+        consentAction ===
+        "accept"
           ? "Enter the CSS selector for the Accept All button."
           : "Enter the CSS selector for the Reject All button.",
       );
@@ -646,6 +784,9 @@ function NewScanPage() {
           necessaryCookieAllowlist:
             selectedCookies,
 
+          necessaryStorageAllowlist:
+            parsedStorageAllowlist,
+
           sourceCodeFolder:
             hasSourceCodeCheck
               ? cleanedSourceFolder
@@ -674,7 +815,9 @@ function NewScanPage() {
         data?.scan?._id ??
         data?.scan?.id;
 
-      if (!createdScanId) {
+      if (
+        !createdScanId
+      ) {
         throw new Error(
           "The server created the scan but did not return its ID.",
         );
@@ -690,7 +833,9 @@ function NewScanPage() {
           : `Source: ${cleanedSourceFolder}`,
       );
 
-      setIsScanRunning(true);
+      setIsScanRunning(
+        true,
+      );
     } catch (error) {
       console.error(
         "Unable to start scan:",
@@ -702,15 +847,24 @@ function NewScanPage() {
           "Unable to start the scan.",
       );
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(
+        false,
+      );
     }
   }
 
   const handleScanComplete =
     useCallback(
-      (completedScanId) => {
-        setIsScanRunning(false);
-        setActiveScanId(null);
+      (
+        completedScanId,
+      ) => {
+        setIsScanRunning(
+          false,
+        );
+
+        setActiveScanId(
+          null,
+        );
 
         navigate(
           `/scan-results?scan=${completedScanId}`,
@@ -721,8 +875,13 @@ function NewScanPage() {
 
   const handleCloseProgress =
     useCallback(() => {
-      setIsScanRunning(false);
-      setActiveScanId(null);
+      setIsScanRunning(
+        false,
+      );
+
+      setActiveScanId(
+        null,
+      );
     }, []);
 
   return (
@@ -737,7 +896,9 @@ function NewScanPage() {
 
         <form
           className="scan-setup-card"
-          onSubmit={handleRunScan}
+          onSubmit={
+            handleRunScan
+          }
         >
           <div className="scan-mode-display">
             <span>
@@ -752,6 +913,7 @@ function NewScanPage() {
           <div className="scan-field">
             <label htmlFor="target-website">
               Target Website
+
               {!hasRuntimeChecks && (
                 <span>
                   {" "}
@@ -772,12 +934,17 @@ function NewScanPage() {
               disabled={
                 !hasRuntimeChecks
               }
-              onChange={(event) => {
+              onChange={(
+                event,
+              ) => {
                 setTargetUrl(
-                  event.target.value,
+                  event.target
+                    .value,
                 );
 
-                setErrorMessage("");
+                setErrorMessage(
+                  "",
+                );
               }}
             />
 
@@ -804,12 +971,17 @@ function NewScanPage() {
                       consentAction ===
                       "accept"
                     }
-                    onChange={(event) => {
+                    onChange={(
+                      event,
+                    ) => {
                       setConsentAction(
-                        event.target.value,
+                        event.target
+                          .value,
                       );
 
-                      setErrorMessage("");
+                      setErrorMessage(
+                        "",
+                      );
                     }}
                   />
 
@@ -832,12 +1004,17 @@ function NewScanPage() {
                       consentAction ===
                       "reject"
                     }
-                    onChange={(event) => {
+                    onChange={(
+                      event,
+                    ) => {
                       setConsentAction(
-                        event.target.value,
+                        event.target
+                          .value,
                       );
 
-                      setErrorMessage("");
+                      setErrorMessage(
+                        "",
+                      );
                     }}
                   />
 
@@ -877,21 +1054,27 @@ function NewScanPage() {
                       : "#reject-all"
                   }
                   required
-                  onChange={(event) => {
+                  onChange={(
+                    event,
+                  ) => {
                     if (
                       consentAction ===
                       "accept"
                     ) {
                       setAcceptSelector(
-                        event.target.value,
+                        event.target
+                          .value,
                       );
                     } else {
                       setRejectSelector(
-                        event.target.value,
+                        event.target
+                          .value,
                       );
                     }
 
-                    setErrorMessage("");
+                    setErrorMessage(
+                      "",
+                    );
                   }}
                 />
 
@@ -910,6 +1093,7 @@ function NewScanPage() {
           <div className="scan-field">
             <label htmlFor="source-folder">
               Source Code Folder
+
               {!hasSourceCodeCheck && (
                 <span>
                   {" "}
@@ -922,7 +1106,9 @@ function NewScanPage() {
               id="source-folder"
               name="sourceFolder"
               type="text"
-              value={sourceFolder}
+              value={
+                sourceFolder
+              }
               placeholder="Select source folder (e.g., src/)"
               required={
                 hasSourceCodeCheck
@@ -930,12 +1116,17 @@ function NewScanPage() {
               disabled={
                 !hasSourceCodeCheck
               }
-              onChange={(event) => {
+              onChange={(
+                event,
+              ) => {
                 setSourceFolder(
-                  event.target.value,
+                  event.target
+                    .value,
                 );
 
-                setErrorMessage("");
+                setErrorMessage(
+                  "",
+                );
               }}
             />
 
@@ -955,6 +1146,7 @@ function NewScanPage() {
             <button
               className={[
                 "cookie-allowlist-trigger",
+
                 isAllowlistOpen
                   ? "open"
                   : "",
@@ -968,7 +1160,8 @@ function NewScanPage() {
                 isAllowlistOpen
               }
               disabled={
-                !scanOptions.checkCookies
+                !scanOptions
+                  .checkCookies
               }
               onClick={() =>
                 setIsAllowlistOpen(
@@ -978,8 +1171,8 @@ function NewScanPage() {
               }
             >
               <span className="selected-cookie-preview">
-                {selectedCookies.length ===
-                0 ? (
+                {selectedCookies
+                  .length === 0 ? (
                   <span className="allowlist-placeholder">
                     Select necessary cookies
                   </span>
@@ -987,12 +1180,18 @@ function NewScanPage() {
                   selectedCookies
                     .slice(0, 2)
                     .map(
-                      (cookieName) => (
+                      (
+                        cookieName,
+                      ) => (
                         <span
                           className="selected-cookie-chip"
-                          key={cookieName}
+                          key={
+                            cookieName
+                          }
                         >
-                          {cookieName}
+                          {
+                            cookieName
+                          }
 
                           <span
                             className="selected-cookie-remove"
@@ -1002,7 +1201,8 @@ function NewScanPage() {
                             onClick={(
                               event,
                             ) => {
-                              event.stopPropagation();
+                              event
+                                .stopPropagation();
 
                               removeCookie(
                                 cookieName,
@@ -1017,8 +1217,11 @@ function NewScanPage() {
                                 event.key ===
                                   " "
                               ) {
-                                event.preventDefault();
-                                event.stopPropagation();
+                                event
+                                  .preventDefault();
+
+                                event
+                                  .stopPropagation();
 
                                 removeCookie(
                                   cookieName,
@@ -1033,11 +1236,13 @@ function NewScanPage() {
                     )
                 )}
 
-                {selectedCookies.length >
+                {selectedCookies
+                  .length >
                   2 && (
                   <span className="selected-cookie-count">
                     +
-                    {selectedCookies.length -
+                    {selectedCookies
+                      .length -
                       2}
                   </span>
                 )}
@@ -1050,7 +1255,8 @@ function NewScanPage() {
             </button>
 
             {isAllowlistOpen &&
-              scanOptions.checkCookies && (
+              scanOptions
+                .checkCookies && (
                 <div className="cookie-allowlist-menu">
                   <div className="allowlist-search-wrapper">
                     <svg
@@ -1068,9 +1274,12 @@ function NewScanPage() {
                       }
                       placeholder="Search or add a cookie"
                       aria-label="Search or add a necessary cookie"
-                      onChange={(event) =>
+                      onChange={(
+                        event,
+                      ) =>
                         setAllowlistSearch(
-                          event.target
+                          event
+                            .target
                             .value,
                         )
                       }
@@ -1085,69 +1294,79 @@ function NewScanPage() {
                     role="listbox"
                     aria-multiselectable="true"
                   >
-                    {filteredCookieOptions.map(
-                      (cookie) => {
-                        const isSelected =
-                          selectedCookies.includes(
-                            cookie.name,
+                    {filteredCookieOptions
+                      .map(
+                        (
+                          cookie,
+                        ) => {
+                          const isSelected =
+                            selectedCookies.includes(
+                              cookie.name,
+                            );
+
+                          return (
+                            <button
+                              className={[
+                                "cookie-option",
+
+                                isSelected
+                                  ? "selected"
+                                  : "",
+                              ]
+                                .filter(
+                                  Boolean,
+                                )
+                                .join(
+                                  " ",
+                                )}
+                              type="button"
+                              role="option"
+                              aria-selected={
+                                isSelected
+                              }
+                              key={
+                                cookie.name
+                              }
+                              onClick={() =>
+                                toggleCookie(
+                                  cookie.name,
+                                )
+                              }
+                            >
+                              <span className="cookie-option-check">
+                                {isSelected && (
+                                  <svg
+                                    viewBox="0 0 16 16"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="m3 8.2 3 3L13 4.8" />
+                                  </svg>
+                                )}
+                              </span>
+
+                              <span className="cookie-option-text">
+                                <strong>
+                                  {
+                                    cookie.name
+                                  }
+                                </strong>
+
+                                <small>
+                                  {
+                                    cookie.description
+                                  }
+                                </small>
+                              </span>
+                            </button>
                           );
+                        },
+                      )}
 
-                        return (
-                          <button
-                            className={[
-                              "cookie-option",
-                              isSelected
-                                ? "selected"
-                                : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" ")}
-                            type="button"
-                            role="option"
-                            aria-selected={
-                              isSelected
-                            }
-                            key={
-                              cookie.name
-                            }
-                            onClick={() =>
-                              toggleCookie(
-                                cookie.name,
-                              )
-                            }
-                          >
-                            <span className="cookie-option-check">
-                              {isSelected && (
-                                <svg
-                                  viewBox="0 0 16 16"
-                                  aria-hidden="true"
-                                >
-                                  <path d="m3 8.2 3 3L13 4.8" />
-                                </svg>
-                              )}
-                            </span>
-
-                            <span className="cookie-option-text">
-                              <strong>
-                                {
-                                  cookie.name
-                                }
-                              </strong>
-
-                              <small>
-                                {
-                                  cookie.description
-                                }
-                              </small>
-                            </span>
-                          </button>
-                        );
-                      },
-                    )}
-
-                    {filteredCookieOptions.length ===
+                    {filteredCookieOptions
+                      .length ===
                       0 &&
-                      allowlistSearch.trim() && (
+                      allowlistSearch
+                        .trim() && (
                         <button
                           className="add-custom-cookie-button"
                           type="button"
@@ -1163,7 +1382,8 @@ function NewScanPage() {
                             Add{" "}
                             <strong>
                               “
-                              {allowlistSearch.trim()}
+                              {allowlistSearch
+                                .trim()}
                               ”
                             </strong>
                           </span>
@@ -1174,7 +1394,8 @@ function NewScanPage() {
                   <div className="allowlist-menu-footer">
                     <span>
                       {
-                        selectedCookies.length
+                        selectedCookies
+                          .length
                       }{" "}
                       selected
                     </span>
@@ -1194,6 +1415,42 @@ function NewScanPage() {
               )}
           </div>
 
+          <div className="scan-field">
+            <label htmlFor="storage-allowlist">
+              Necessary Storage Allowlist
+            </label>
+
+            <input
+              id="storage-allowlist"
+              name="storageAllowlist"
+              type="text"
+              value={
+                necessaryStorageAllowlist
+              }
+              placeholder="site_consent, consent_preferences"
+              disabled={
+                !scanOptions
+                  .checkStorage
+              }
+              onChange={(
+                event,
+              ) => {
+                setNecessaryStorageAllowlist(
+                  event.target
+                    .value,
+                );
+
+                setErrorMessage(
+                  "",
+                );
+              }}
+            />
+
+            <small className="scan-field-help">
+              Enter necessary localStorage or sessionStorage keys separated by commas.
+            </small>
+          </div>
+
           <fieldset className="scan-option-group scan-options-group">
             <legend>
               Scan Options
@@ -1204,7 +1461,8 @@ function NewScanPage() {
                 type="checkbox"
                 name="checkCookies"
                 checked={
-                  scanOptions.checkCookies
+                  scanOptions
+                    .checkCookies
                 }
                 onChange={
                   updateScanOption
@@ -1249,7 +1507,8 @@ function NewScanPage() {
                 type="checkbox"
                 name="checkStorage"
                 checked={
-                  scanOptions.checkStorage
+                  scanOptions
+                    .checkStorage
                 }
                 onChange={
                   updateScanOption
@@ -1271,7 +1530,8 @@ function NewScanPage() {
                 type="checkbox"
                 name="scanSourceCode"
                 checked={
-                  scanOptions.scanSourceCode
+                  scanOptions
+                    .scanSourceCode
                 }
                 onChange={
                   updateScanOption
@@ -1302,9 +1562,13 @@ function NewScanPage() {
             <button
               className="scan-action-button"
               type="button"
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting
+              }
               onClick={() =>
-                navigate("/dashboard")
+                navigate(
+                  "/dashboard",
+                )
               }
             >
               Cancel
@@ -1329,7 +1593,9 @@ function NewScanPage() {
       {isScanRunning &&
         activeScanId && (
           <ScanProgressModal
-            scanId={activeScanId}
+            scanId={
+              activeScanId
+            }
             targetUrl={
               activeTargetUrl
             }
