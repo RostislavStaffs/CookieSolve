@@ -8,9 +8,20 @@ import {
 
 import {
   analyseRuntimeFindings,
+  buildFindingsSummary,
 } from "../services/findingsAnalyzer.js";
 
-function getAuthenticatedUserId(request) {
+import {
+  scanSourceCode,
+} from "../services/sourceCodeScanner.js";
+
+import {
+  correlateFindings,
+} from "../services/findingsCorrelator.js";
+
+function getAuthenticatedUserId(
+  request,
+) {
   return (
     request.user?._id ??
     request.user?.id ??
@@ -44,7 +55,9 @@ function parseBoolean(
   value,
   defaultValue,
 ) {
-  if (typeof value === "boolean") {
+  if (
+    typeof value === "boolean"
+  ) {
     return value;
   }
 
@@ -59,7 +72,9 @@ function parseBoolean(
   return defaultValue;
 }
 
-function validateTargetUrl(targetUrl) {
+function validateTargetUrl(
+  targetUrl,
+) {
   try {
     const parsedUrl =
       new URL(targetUrl);
@@ -83,28 +98,64 @@ function createEmptyRuntimePhase() {
   };
 }
 
+function deriveScanMode(
+  scanOptions,
+) {
+  const hasRuntimeChecks =
+    scanOptions.cookies ||
+    scanOptions.networkRequests ||
+    scanOptions.browserStorage;
+
+  const hasSourceCodeCheck =
+    scanOptions.sourceCode;
+
+  if (
+    hasRuntimeChecks &&
+    hasSourceCodeCheck
+  ) {
+    return "hybrid";
+  }
+
+  if (hasRuntimeChecks) {
+    return "runtime";
+  }
+
+  return "source-code";
+}
+
 function createLegacySummary({
   preConsent,
   postAction,
   findingsSummary,
   consentAction,
+  scanMode,
 }) {
+  const hasRuntimeEvidence =
+    scanMode === "runtime" ||
+    scanMode === "hybrid";
+
   return {
     cookiesBeforeConsent:
-      preConsent.cookies.length,
+      hasRuntimeEvidence
+        ? preConsent.cookies.length
+        : 0,
 
     cookiesAfterRejection:
+      hasRuntimeEvidence &&
       consentAction === "reject"
         ? postAction.cookies.length
         : 0,
 
     thirdPartyRequestsBeforeConsent:
-      preConsent.networkRequests.filter(
-        (request) =>
-          request.isThirdParty,
-      ).length,
+      hasRuntimeEvidence
+        ? preConsent.networkRequests.filter(
+            (request) =>
+              request.isThirdParty,
+          ).length
+        : 0,
 
     thirdPartyRequestsAfterRejection:
+      hasRuntimeEvidence &&
       consentAction === "reject"
         ? postAction.networkRequests.filter(
             (request) =>
@@ -140,76 +191,160 @@ async function executeScan(scanId) {
 
     scan.status = "running";
     scan.currentStep =
-      "Starting runtime scan";
+      "Starting scan";
     scan.startedAt = new Date();
+    scan.completedAt = null;
     scan.errorMessage = "";
 
     await scan.save();
 
-    const runtimeResult =
-      await runRuntimeScan({
-        targetUrl:
-          scan.targetUrl,
+    const hasRuntimeChecks =
+      scan.scanMode === "runtime" ||
+      scan.scanMode === "hybrid";
 
-        consentAction:
-          scan.consentAction,
+    const hasSourceCodeCheck =
+      scan.scanMode === "source-code" ||
+      scan.scanMode === "hybrid";
 
-        acceptSelector:
-          scan.acceptSelector,
+    let runtimeResult = {
+      preConsent:
+        createEmptyRuntimePhase(),
 
-        rejectSelector:
-          scan.rejectSelector,
+      postAction:
+        createEmptyRuntimePhase(),
+    };
 
-        browser:
-          scan.browser,
+    let runtimeFindings = [];
+    let sourceCodeFindings = [];
 
-        waitTime:
-          scan.waitTime,
+    /*
+     * Runtime analysis is completely skipped
+     * for source-code-only scans.
+     */
+    if (hasRuntimeChecks) {
+      runtimeResult =
+        await runRuntimeScan({
+          targetUrl:
+            scan.targetUrl,
 
-        scanOptions:
-          scan.scanOptions,
+          consentAction:
+            scan.consentAction,
 
-        onStepChange: async (
-          currentStep,
-        ) => {
-          await updateScanStep(
-            scan._id,
+          acceptSelector:
+            scan.acceptSelector,
+
+          rejectSelector:
+            scan.rejectSelector,
+
+          browser:
+            scan.browser,
+
+          waitTime:
+            scan.waitTime,
+
+          scanOptions:
+            scan.scanOptions,
+
+          onStepChange: async (
             currentStep,
-          );
-        },
-      });
+          ) => {
+            await updateScanStep(
+              scan._id,
+              currentStep,
+            );
+          },
+        });
 
-    const scanStillExists =
-      await Scan.exists({
-        _id: scan._id,
-      });
+      await updateScanStep(
+        scan._id,
+        "Analysing runtime evidence",
+      );
 
-    if (!scanStillExists) {
-      return;
+      const runtimeAnalysis =
+        analyseRuntimeFindings({
+          preConsent:
+            runtimeResult.preConsent,
+
+          postAction:
+            runtimeResult.postAction,
+
+          consentAction:
+            scan.consentAction,
+
+          necessaryCookieAllowlist:
+            scan.necessaryCookieAllowlist,
+
+          scanOptions:
+            scan.scanOptions,
+        });
+
+      runtimeFindings =
+        runtimeAnalysis.findings;
+    }
+
+    if (hasSourceCodeCheck) {
+      const sourceCodeResult =
+        await scanSourceCode({
+          sourceCodeFolder:
+            scan.sourceCodeFolder,
+
+          onStepChange: async (
+            currentStep,
+          ) => {
+            await updateScanStep(
+              scan._id,
+              currentStep,
+            );
+          },
+        });
+
+      sourceCodeFindings =
+        sourceCodeResult.findings;
     }
 
     await updateScanStep(
       scan._id,
-      "Analysing captured evidence",
+      "Combining scan findings",
     );
 
-    const analysis =
-      analyseRuntimeFindings({
-        preConsent:
-          runtimeResult.preConsent,
+    const combinedFindings = [
+      ...runtimeFindings,
+      ...sourceCodeFindings,
+    ];
 
-        postAction:
-          runtimeResult.postAction,
+    /*
+     * Correlation is meaningful only when both
+     * runtime and static evidence exist.
+     */
+    let correlations = [];
 
-        consentAction:
-          scan.consentAction,
+    if (scan.scanMode === "hybrid") {
+      await updateScanStep(
+        scan._id,
+        "Correlating runtime and source evidence",
+      );
 
-        necessaryCookieAllowlist:
-          scan.necessaryCookieAllowlist,
+      correlations =
+        correlateFindings(
+          combinedFindings,
+        );
+    }
 
-        scanOptions:
-          scan.scanOptions,
-      });
+    const combinedSummary =
+      buildFindingsSummary(
+        combinedFindings,
+      );
+
+    combinedSummary.correlations =
+      correlations.length;
+
+    combinedSummary
+      .highConfidenceCorrelations =
+      correlations.filter(
+        (correlation) =>
+          correlation.confidence ===
+          "high",
+      ).length;
 
     scan.preConsent =
       runtimeResult.preConsent;
@@ -217,20 +352,20 @@ async function executeScan(scanId) {
     scan.postAction =
       runtimeResult.postAction;
 
-    /*
-     * Keep this compatibility field populated
-     * only for Reject All scans.
-     */
     scan.postRejection =
+      hasRuntimeChecks &&
       scan.consentAction === "reject"
         ? runtimeResult.postAction
         : createEmptyRuntimePhase();
 
     scan.findings =
-      analysis.findings;
+      combinedFindings;
+
+    scan.correlations =
+      correlations;
 
     scan.findingsSummary =
-      analysis.summary;
+      combinedSummary;
 
     scan.summary =
       createLegacySummary({
@@ -241,10 +376,13 @@ async function executeScan(scanId) {
           runtimeResult.postAction,
 
         findingsSummary:
-          analysis.summary,
+          combinedSummary,
 
         consentAction:
           scan.consentAction,
+
+        scanMode:
+          scan.scanMode,
       });
 
     scan.status = "completed";
@@ -256,27 +394,25 @@ async function executeScan(scanId) {
     await scan.save();
   } catch (error) {
     console.error(
-      "Runtime scan failed:",
+      "Scan failed:",
       error,
     );
 
-    /*
-     * The record may have been deleted while the
-     * asynchronous scan was still executing.
-     */
     try {
       await Scan.findByIdAndUpdate(
         scanId,
         {
           status: "failed",
-          currentStep: "Scan failed",
+          currentStep:
+            "Scan failed",
 
           errorMessage:
             error instanceof Error
               ? error.message
-              : "The runtime scan failed.",
+              : "The scan failed.",
 
-          completedAt: new Date(),
+          completedAt:
+            new Date(),
         },
       );
     } catch (updateError) {
@@ -308,7 +444,7 @@ export async function createScan(
     }
 
     const {
-      targetUrl,
+      targetUrl = "",
       consentAction = "reject",
       acceptSelector = "#accept-all",
       rejectSelector = "#reject-all",
@@ -317,93 +453,6 @@ export async function createScan(
       sourceCodeFolder = "",
       scanOptions = {},
     } = request.body;
-
-    if (
-      !targetUrl ||
-      !validateTargetUrl(
-        targetUrl,
-      )
-    ) {
-      return response
-        .status(400)
-        .json({
-          message:
-            "Enter a valid HTTP or HTTPS target URL.",
-        });
-    }
-
-    if (
-      ![
-        "accept",
-        "reject",
-      ].includes(
-        consentAction,
-      )
-    ) {
-      return response
-        .status(400)
-        .json({
-          message:
-            "Select either Accept All or Reject All.",
-        });
-    }
-
-    const selectedSelector =
-      consentAction === "accept"
-        ? acceptSelector
-        : rejectSelector;
-
-    if (
-      typeof selectedSelector !==
-        "string" ||
-      !selectedSelector.trim()
-    ) {
-      return response
-        .status(400)
-        .json({
-          message:
-            consentAction === "accept"
-              ? "An Accept All button selector is required."
-              : "A Reject All button selector is required.",
-        });
-    }
-
-    const numericWaitTime =
-      Number(waitTime);
-
-    if (
-      !Number.isFinite(
-        numericWaitTime,
-      ) ||
-      numericWaitTime < 0 ||
-      numericWaitTime > 30000
-    ) {
-      return response
-        .status(400)
-        .json({
-          message:
-            "Wait time must be between 0 and 30000 milliseconds.",
-        });
-    }
-
-    const supportedBrowsers = [
-      "chromium",
-      "firefox",
-      "webkit",
-    ];
-
-    if (
-      !supportedBrowsers.includes(
-        browser,
-      )
-    ) {
-      return response
-        .status(400)
-        .json({
-          message:
-            "The selected browser is not supported.",
-        });
-    }
 
     const resolvedScanOptions = {
       cookies:
@@ -445,6 +494,126 @@ export async function createScan(
         });
     }
 
+    const scanMode =
+      deriveScanMode(
+        resolvedScanOptions,
+      );
+
+    const hasRuntimeChecks =
+      scanMode === "runtime" ||
+      scanMode === "hybrid";
+
+    const hasSourceCodeCheck =
+      scanMode === "source-code" ||
+      scanMode === "hybrid";
+
+    /*
+     * Runtime validation applies only when
+     * Playwright will actually be used.
+     */
+    if (hasRuntimeChecks) {
+      if (
+        !targetUrl ||
+        !validateTargetUrl(
+          targetUrl,
+        )
+      ) {
+        return response
+          .status(400)
+          .json({
+            message:
+              "Enter a valid HTTP or HTTPS target URL for runtime scanning.",
+          });
+      }
+
+      if (
+        ![
+          "accept",
+          "reject",
+        ].includes(
+          consentAction,
+        )
+      ) {
+        return response
+          .status(400)
+          .json({
+            message:
+              "Select either Accept All or Reject All.",
+          });
+      }
+
+      const selectedSelector =
+        consentAction === "accept"
+          ? acceptSelector
+          : rejectSelector;
+
+      if (
+        typeof selectedSelector !==
+          "string" ||
+        !selectedSelector.trim()
+      ) {
+        return response
+          .status(400)
+          .json({
+            message:
+              consentAction === "accept"
+                ? "An Accept All button selector is required."
+                : "A Reject All button selector is required.",
+          });
+      }
+    }
+
+    if (
+      hasSourceCodeCheck &&
+      !String(
+        sourceCodeFolder,
+      ).trim()
+    ) {
+      return response
+        .status(400)
+        .json({
+          message:
+            "Enter a source-code folder when source-code scanning is enabled.",
+        });
+    }
+
+    const numericWaitTime =
+      Number(waitTime);
+
+    if (
+      !Number.isFinite(
+        numericWaitTime,
+      ) ||
+      numericWaitTime < 0 ||
+      numericWaitTime > 30000
+    ) {
+      return response
+        .status(400)
+        .json({
+          message:
+            "Wait time must be between 0 and 30000 milliseconds.",
+        });
+    }
+
+    const supportedBrowsers = [
+      "chromium",
+      "firefox",
+      "webkit",
+    ];
+
+    if (
+      !supportedBrowsers.includes(
+        browser,
+      )
+    ) {
+      return response
+        .status(400)
+        .json({
+          message:
+            "The selected browser is not supported.",
+        });
+    }
+
     const necessaryCookieAllowlist =
       parseAllowlist(
         request.body
@@ -455,8 +624,14 @@ export async function createScan(
       await Scan.create({
         user: userId,
 
+        scanMode,
+
         targetUrl:
-          targetUrl.trim(),
+          hasRuntimeChecks
+            ? String(
+                targetUrl,
+              ).trim()
+            : "",
 
         consentAction,
 
@@ -478,9 +653,11 @@ export async function createScan(
         necessaryCookieAllowlist,
 
         sourceCodeFolder:
-          String(
-            sourceCodeFolder,
-          ).trim(),
+          hasSourceCodeCheck
+            ? String(
+                sourceCodeFolder,
+              ).trim()
+            : "",
 
         scanOptions:
           resolvedScanOptions,
