@@ -77,57 +77,43 @@ const VENDOR_INDICATORS = {
     "navigator.sendbeacon",
     "beacon",
   ],
-
-  cookie: [
-    "document.cookie",
-    "cookie",
-  ],
-
-  "local-storage": [
-    "localstorage",
-    "localstorage.setitem",
-  ],
-
-  "session-storage": [
-    "sessionstorage",
-    "sessionstorage.setitem",
-  ],
 };
 
-const GENERIC_IGNORED_WORDS = new Set([
-  "http",
-  "https",
-  "www",
-  "com",
-  "net",
-  "org",
-  "the",
-  "and",
-  "that",
-  "this",
-  "with",
-  "from",
-  "before",
-  "after",
-  "consent",
-  "user",
-  "request",
-  "created",
-  "detected",
-  "potential",
-  "tracking",
-  "analytics",
-  "source",
-  "code",
-  "script",
-  "storage",
-  "cookie",
-  "local",
-  "session",
-  "high",
-  "medium",
-  "low",
-]);
+const GENERIC_IGNORED_WORDS =
+  new Set([
+    "http",
+    "https",
+    "www",
+    "com",
+    "net",
+    "org",
+    "the",
+    "and",
+    "that",
+    "this",
+    "with",
+    "from",
+    "before",
+    "after",
+    "consent",
+    "user",
+    "request",
+    "created",
+    "detected",
+    "potential",
+    "tracking",
+    "analytics",
+    "source",
+    "code",
+    "script",
+    "storage",
+    "cookie",
+    "local",
+    "session",
+    "high",
+    "medium",
+    "low",
+  ]);
 
 function normalise(value) {
   return String(value ?? "")
@@ -140,20 +126,28 @@ function flattenEvidence(evidence) {
     return "";
   }
 
-  if (typeof evidence === "string") {
+  if (
+    typeof evidence ===
+    "string"
+  ) {
     return evidence;
   }
 
-  if (Array.isArray(evidence)) {
+  if (
+    Array.isArray(evidence)
+  ) {
     return evidence
       .map(flattenEvidence)
       .join(" ");
   }
 
   if (
-    typeof evidence === "object"
+    typeof evidence ===
+    "object"
   ) {
-    return Object.values(evidence)
+    return Object.values(
+      evidence,
+    )
       .map(flattenEvidence)
       .join(" ");
   }
@@ -161,7 +155,9 @@ function flattenEvidence(evidence) {
   return String(evidence);
 }
 
-function createFindingText(finding) {
+function createFindingText(
+  finding,
+) {
   return normalise(
     [
       finding?.type,
@@ -177,7 +173,9 @@ function createFindingText(finding) {
 function extractTokens(text) {
   return new Set(
     normalise(text)
-      .split(/[^a-z0-9_.:/-]+/i)
+      .split(
+        /[^a-z0-9_.:/-]+/i,
+      )
       .map((token) =>
         token.trim(),
       )
@@ -237,7 +235,8 @@ function getExactEvidenceMatches({
   sourceFinding,
 }) {
   const runtimeEvidence =
-    runtimeFinding?.evidence ?? {};
+    runtimeFinding?.evidence ??
+    {};
 
   const sourceText =
     createFindingText(
@@ -258,7 +257,9 @@ function getExactEvidenceMatches({
 
   return possibleValues.filter(
     (value) =>
-      sourceText.includes(value),
+      sourceText.includes(
+        value,
+      ),
   );
 }
 
@@ -277,10 +278,14 @@ function calculateCorrelation({
     );
 
   const runtimeVendors =
-    detectVendors(runtimeText);
+    detectVendors(
+      runtimeText,
+    );
 
   const sourceVendors =
-    detectVendors(sourceText);
+    detectVendors(
+      sourceText,
+    );
 
   const sharedVendors =
     getSharedValues(
@@ -289,10 +294,14 @@ function calculateCorrelation({
     );
 
   const runtimeTokens =
-    extractTokens(runtimeText);
+    extractTokens(
+      runtimeText,
+    );
 
   const sourceTokens =
-    extractTokens(sourceText);
+    extractTokens(
+      sourceText,
+    );
 
   const sharedTokens =
     getSharedValues(
@@ -309,10 +318,12 @@ function calculateCorrelation({
   let score = 0;
 
   score +=
-    sharedVendors.length * 5;
+    sharedVendors.length *
+    5;
 
   score +=
-    exactEvidenceMatches.length * 4;
+    exactEvidenceMatches
+      .length * 4;
 
   score +=
     Math.min(
@@ -321,8 +332,10 @@ function calculateCorrelation({
     );
 
   /*
-   * Give additional weight when the source rule
-   * and runtime category naturally correspond.
+   * Category compatibility is
+   * supporting evidence only.
+   * It must not create a strong
+   * correlation by itself.
    */
   if (
     runtimeFinding.category ===
@@ -336,7 +349,7 @@ function calculateCorrelation({
       sourceFinding.type,
     )
   ) {
-    score += 2;
+    score += 1;
   }
 
   if (
@@ -349,7 +362,7 @@ function calculateCorrelation({
       sourceFinding.type,
     )
   ) {
-    score += 3;
+    score += 1;
   }
 
   if (
@@ -367,16 +380,39 @@ function calculateCorrelation({
       sourceFinding.type,
     )
   ) {
-    score += 2;
+    score += 1;
   }
 
   let confidence = null;
 
-  if (score >= 8) {
+  /*
+   * High confidence now requires
+   * an exact runtime identifier,
+   * such as a cookie name,
+   * storage key, hostname or
+   * domain appearing in the
+   * source evidence.
+   */
+  if (
+    score >= 12 &&
+    exactEvidenceMatches
+      .length > 0
+  ) {
     confidence = "high";
-  } else if (score >= 5) {
+  } else if (
+    score >= 8 &&
+    (
+      exactEvidenceMatches
+        .length > 0 ||
+      sharedVendors.length > 0
+    )
+  ) {
     confidence = "medium";
-  } else if (score >= 3) {
+  } else if (
+    score >= 6 &&
+    exactEvidenceMatches
+      .length > 0
+  ) {
     confidence = "low";
   }
 
@@ -392,8 +428,9 @@ function calculateCorrelation({
         index,
         values,
       ) =>
-        values.indexOf(value) ===
-        index,
+        values.indexOf(
+          value,
+        ) === index,
     )
     .slice(0, 10);
 
@@ -411,11 +448,13 @@ function createExplanation({
   matchedIndicators,
 }) {
   const sourceFile =
-    sourceFinding?.evidence?.file ??
+    sourceFinding
+      ?.evidence?.file ??
     "the identified source file";
 
   const sourceLine =
-    sourceFinding?.evidence?.line;
+    sourceFinding
+      ?.evidence?.line;
 
   const location =
     sourceLine
@@ -423,8 +462,11 @@ function createExplanation({
       : sourceFile;
 
   const indicatorsText =
-    matchedIndicators.length > 0
-      ? matchedIndicators.join(", ")
+    matchedIndicators.length >
+    0
+      ? matchedIndicators.join(
+          ", ",
+        )
       : "related tracking behaviour";
 
   return (
@@ -500,7 +542,9 @@ export function correlateFindings(
             sourceItem.finding,
         });
 
-      if (!result.confidence) {
+      if (
+        !result.confidence
+      ) {
         continue;
       }
 
@@ -512,20 +556,25 @@ export function correlateFindings(
           sourceItem.index,
 
         runtimeFindingType:
-          runtimeItem.finding.type,
+          runtimeItem.finding
+            .type,
 
         sourceFindingType:
-          sourceItem.finding.type,
+          sourceItem.finding
+            .type,
 
         runtimeTitle:
-          runtimeItem.finding.title,
+          runtimeItem.finding
+            .title,
 
         sourceTitle:
-          sourceItem.finding.title,
+          sourceItem.finding
+            .title,
 
         sourceFile:
           sourceItem.finding
-            ?.evidence?.file ?? "",
+            ?.evidence?.file ??
+          "",
 
         sourceLine:
           Number(
@@ -540,7 +589,8 @@ export function correlateFindings(
           result.score,
 
         matchedIndicators:
-          result.matchedIndicators,
+          result
+            .matchedIndicators,
 
         explanation:
           createExplanation({
@@ -554,16 +604,17 @@ export function correlateFindings(
               result.confidence,
 
             matchedIndicators:
-              result.matchedIndicators,
+              result
+                .matchedIndicators,
           }),
       });
     }
   }
 
   /*
-   * Keep the strongest correlation for each
-   * runtime/source finding pair and show the
-   * strongest results first.
+   * Keep the strongest result
+   * for each runtime/source
+   * finding pair.
    */
   const uniqueCorrelations =
     new Map();
@@ -575,6 +626,7 @@ export function correlateFindings(
     const identifier = [
       correlation
         .runtimeFindingIndex,
+
       correlation
         .sourceFindingIndex,
     ].join("|");

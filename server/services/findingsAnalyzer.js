@@ -5,6 +5,9 @@ const DEFAULT_CONSENT_STORAGE_KEYS = [
   "cookie_consent_status",
   "consent_status",
   "user_consent",
+  "site_consent",
+  "consent_preferences",
+  "cookie_preferences",
 ];
 
 const SUSPICIOUS_REQUEST_KEYWORDS = [
@@ -31,13 +34,23 @@ const SUSPICIOUS_REQUEST_KEYWORDS = [
   "amplitude",
 ];
 
-const IGNORED_RESOURCE_TYPES =
+const STATIC_ASSET_RESOURCE_TYPES =
   new Set([
     "document",
     "stylesheet",
     "font",
     "image",
     "media",
+    "script",
+  ]);
+
+const TRACKING_REQUEST_RESOURCE_TYPES =
+  new Set([
+    "fetch",
+    "xhr",
+    "websocket",
+    "eventsource",
+    "ping",
   ]);
 
 function normalise(value) {
@@ -95,6 +108,21 @@ function isAllowlistedCookie(
   );
 }
 
+function isAllowlistedStorage(
+  item,
+  allowlist = [],
+) {
+  const storageKey =
+    normalise(item.key);
+
+  return allowlist.some(
+    (allowedKey) =>
+      normalise(
+        allowedKey,
+      ) === storageKey,
+  );
+}
+
 function requestContainsSuspiciousKeyword(
   request,
 ) {
@@ -110,41 +138,66 @@ function requestContainsSuspiciousKeyword(
 function isSuspiciousRequest(
   request,
 ) {
-  if (request.isThirdParty) {
-    return true;
-  }
-
-  if (
-    requestContainsSuspiciousKeyword(
-      request,
-    )
-  ) {
-    return true;
-  }
-
   const resourceType =
     normalise(
       request.resourceType,
     );
 
-  if (
-    !IGNORED_RESOURCE_TYPES.has(
-      resourceType,
-    ) &&
-    [
-      "fetch",
-      "xhr",
-      "websocket",
-      "eventsource",
-      "ping",
-    ].includes(resourceType)
-  ) {
-    return requestContainsSuspiciousKeyword(
+  const containsTrackingKeyword =
+    requestContainsSuspiciousKeyword(
       request,
     );
+
+  /*
+   * Loading a same-origin application asset such
+   * as analytics.js does not prove that tracking
+   * activity occurred.
+   */
+  if (
+    request.isThirdParty === false &&
+    STATIC_ASSET_RESOURCE_TYPES.has(
+      resourceType,
+    )
+  ) {
+    return false;
   }
 
-  return false;
+  /*
+   * Third-party static assets should only be
+   * reported when their URL contains a recognised
+   * tracking indicator.
+   */
+  if (
+    request.isThirdParty &&
+    STATIC_ASSET_RESOURCE_TYPES.has(
+      resourceType,
+    )
+  ) {
+    return containsTrackingKeyword;
+  }
+
+  /*
+   * Fetch, XHR, beacon-style and similar requests
+   * are reported only when their endpoint appears
+   * tracking-related.
+   */
+  if (
+    TRACKING_REQUEST_RESOURCE_TYPES.has(
+      resourceType,
+    )
+  ) {
+    return containsTrackingKeyword;
+  }
+
+  /*
+   * Unknown third-party resource types still
+   * receive cautious treatment when associated
+   * with a tracking indicator.
+   */
+  return (
+    request.isThirdParty &&
+    containsTrackingKeyword
+  );
 }
 
 function createFinding({
@@ -316,33 +369,52 @@ function analysePostRejectionCookies({
   return findings;
 }
 
-function analysePreConsentStorage(
+function analysePreConsentStorage({
   preConsentStorage,
-) {
+  necessaryStorageAllowlist,
+}) {
   return preConsentStorage
     .filter(
       (item) =>
         !isConsentStorageKey(
           item.key,
+        ) &&
+        !isAllowlistedStorage(
+          item,
+          necessaryStorageAllowlist,
         ),
     )
     .map((item) =>
       createFinding({
         category:
           "browser-storage",
-        phase: "pre-consent",
+
+        phase:
+          "pre-consent",
+
         type:
           "storage-before-consent",
-        severity: "medium",
+
+        severity:
+          "medium",
+
         title:
           "Browser storage created before consent",
+
         description:
           `The ${item.storageType} entry "${item.key}" ` +
           "was present before a consent choice was made.",
+
         evidence: {
-          origin: item.origin,
-          key: item.key,
-          value: item.value,
+          origin:
+            item.origin,
+
+          key:
+            item.key,
+
+          value:
+            item.value,
+
           storageType:
             item.storageType,
         },
@@ -353,6 +425,7 @@ function analysePreConsentStorage(
 function analysePostRejectionStorage({
   preConsentStorage,
   postRejectionStorage,
+  necessaryStorageAllowlist,
 }) {
   const findings = [];
 
@@ -375,6 +448,10 @@ function analysePostRejectionStorage({
     if (
       isConsentStorageKey(
         item.key,
+      ) ||
+      isAllowlistedStorage(
+        item,
+        necessaryStorageAllowlist,
       )
     ) {
       continue;
@@ -395,22 +472,36 @@ function analysePostRejectionStorage({
         createFinding({
           category:
             "browser-storage",
+
           phase:
             "post-rejection",
+
           type:
             "storage-persisted-after-rejection",
-          severity: "medium",
+
+          severity:
+            "medium",
+
           title:
             "Browser storage persisted after rejection",
+
           description:
             `The ${item.storageType} entry "${item.key}" ` +
             "existed before consent and remained after rejection.",
+
           evidence: {
-            origin: item.origin,
-            key: item.key,
-            value: item.value,
+            origin:
+              item.origin,
+
+            key:
+              item.key,
+
+            value:
+              item.value,
+
             previousValue:
               existingItem.value,
+
             storageType:
               item.storageType,
           },
@@ -424,20 +515,33 @@ function analysePostRejectionStorage({
       createFinding({
         category:
           "browser-storage",
+
         phase:
           "post-rejection",
+
         type:
           "storage-created-after-rejection",
-        severity: "medium",
+
+        severity:
+          "medium",
+
         title:
           "Browser storage created after rejection",
+
         description:
           `The ${item.storageType} entry "${item.key}" ` +
           "was newly created after the user rejected consent.",
+
         evidence: {
-          origin: item.origin,
-          key: item.key,
-          value: item.value,
+          origin:
+            item.origin,
+
+          key:
+            item.key,
+
+          value:
+            item.value,
+
           storageType:
             item.storageType,
         },
@@ -597,6 +701,7 @@ export function analyseRuntimeFindings({
   postAction,
   consentAction = "reject",
   necessaryCookieAllowlist = [],
+  necessaryStorageAllowlist = [],
   scanOptions = {},
 }) {
   const resolvedScanOptions = {
@@ -662,10 +767,13 @@ export function analyseRuntimeFindings({
       .browserStorage
   ) {
     findings.push(
-      ...analysePreConsentStorage(
-        safePreConsent
-          .browserStorage,
-      ),
+      ...analysePreConsentStorage({
+  preConsentStorage:
+    safePreConsent
+      .browserStorage,
+
+  necessaryStorageAllowlist,
+}),
     );
   }
 
@@ -714,14 +822,16 @@ export function analyseRuntimeFindings({
     ) {
       findings.push(
         ...analysePostRejectionStorage({
-          preConsentStorage:
-            safePreConsent
-              .browserStorage,
+  preConsentStorage:
+    safePreConsent
+      .browserStorage,
 
-          postRejectionStorage:
-            safePostAction
-              .browserStorage,
-        }),
+  postRejectionStorage:
+    safePostAction
+      .browserStorage,
+
+  necessaryStorageAllowlist,
+}),
       );
     }
 
