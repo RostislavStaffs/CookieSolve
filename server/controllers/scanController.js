@@ -261,22 +261,25 @@ async function executeScan(scanId) {
       );
 
       const runtimeAnalysis =
-        analyseRuntimeFindings({
-          preConsent:
-            runtimeResult.preConsent,
+  analyseRuntimeFindings({
+    preConsent:
+      runtimeResult.preConsent,
 
-          postAction:
-            runtimeResult.postAction,
+    postAction:
+      runtimeResult.postAction,
 
-          consentAction:
-            scan.consentAction,
+    consentAction:
+      scan.consentAction,
 
-          necessaryCookieAllowlist:
-            scan.necessaryCookieAllowlist,
+    necessaryCookieAllowlist:
+      scan.necessaryCookieAllowlist,
 
-          scanOptions:
-            scan.scanOptions,
-        });
+    necessaryStorageAllowlist:
+      scan.necessaryStorageAllowlist,
+
+    scanOptions:
+      scan.scanOptions,
+  });
 
       runtimeFindings =
         runtimeAnalysis.findings;
@@ -618,6 +621,11 @@ export async function createScan(
       parseAllowlist(
         request.body
           .necessaryCookieAllowlist,
+      );
+      const necessaryStorageAllowlist =
+      parseAllowlist(
+        request.body
+          .necessaryStorageAllowlist,
       );
 
     const scan =
