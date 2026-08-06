@@ -464,7 +464,11 @@ const scanSchema =
         type: [String],
         default: [],
       },
-
+      necessaryStorageAllowlist: {
+        type: [String],
+        default: [],
+      },
+      
       scanOptions: {
         cookies: {
           type: Boolean,
