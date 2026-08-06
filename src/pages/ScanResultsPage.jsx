@@ -17,12 +17,18 @@ import NetworkFindingsModal from "../components/NetworkFindingsModal";
 import SourceCodeFindingsModal from "../components/SourceCodeFindingsModal";
 import BrowserStorageFindingsModal from "../components/BrowserStorageFindingsModal";
 import FixGuidanceModal from "../components/FixGuidanceModal";
+import CorrelationFindingsModal from "../components/CorrelationFindingsModal";
+import ExportReportModal from "../components/ExportReportModal";
 
-import { getScan } from "../services/scanApi";
+import {
+  getScan,
+} from "../services/scanApi";
 
 import "./ScanResultsPage.css";
 
-function buildFallbackSummary(findings) {
+function buildFallbackSummary(
+  findings,
+) {
   const summary = {
     total: findings.length,
     high: 0,
@@ -35,56 +41,71 @@ function buildFallbackSummary(findings) {
     preConsent: 0,
     postRejection: 0,
     postAcceptance: 0,
+    correlations: 0,
+    highConfidenceCorrelations: 0,
   };
 
-  for (const finding of findings) {
+  for (
+    const finding of findings
+  ) {
     if (
-      Object.prototype.hasOwnProperty.call(
-        summary,
-        finding.severity,
+      [
+        "high",
+        "medium",
+        "low",
+      ].includes(
+        finding?.severity,
       )
     ) {
-      summary[finding.severity] += 1;
+      summary[
+        finding.severity
+      ] += 1;
     }
 
-    if (finding.category === "cookie") {
+    if (
+      finding?.category ===
+      "cookie"
+    ) {
       summary.cookies += 1;
     }
 
-    if (finding.category === "network") {
+    if (
+      finding?.category ===
+      "network"
+    ) {
       summary.network += 1;
     }
 
     if (
-      finding.category ===
+      finding?.category ===
       "browser-storage"
     ) {
       summary.browserStorage += 1;
     }
 
     if (
-      finding.category ===
+      finding?.category ===
       "source-code"
     ) {
       summary.sourceCode += 1;
     }
 
     if (
-      finding.phase ===
+      finding?.phase ===
       "pre-consent"
     ) {
       summary.preConsent += 1;
     }
 
     if (
-      finding.phase ===
+      finding?.phase ===
       "post-rejection"
     ) {
       summary.postRejection += 1;
     }
 
     if (
-      finding.phase ===
+      finding?.phase ===
       "post-acceptance"
     ) {
       summary.postAcceptance += 1;
@@ -98,7 +119,9 @@ function getOverallStatus(
   scan,
   findingsSummary,
 ) {
-  if (scan?.status === "failed") {
+  if (
+    scan?.status === "failed"
+  ) {
     return "FAILED";
   }
 
@@ -110,14 +133,12 @@ function getOverallStatus(
   }
 
   if (
-    (findingsSummary.high ?? 0) > 0
-  ) {
-    return "WARNING";
-  }
-
-  if (
-    (findingsSummary.medium ?? 0) > 0 ||
-    (findingsSummary.low ?? 0) > 0
+    (findingsSummary.high ??
+      0) > 0 ||
+    (findingsSummary.medium ??
+      0) > 0 ||
+    (findingsSummary.low ??
+      0) > 0
   ) {
     return "WARNING";
   }
@@ -128,13 +149,69 @@ function getOverallStatus(
 function getConsentActionLabel(
   consentAction,
 ) {
-  return consentAction === "accept"
+  return consentAction ===
+    "accept"
     ? "Accept All"
     : "Reject All";
 }
 
+function getScanModeLabel(
+  scanMode,
+) {
+  if (
+    scanMode === "hybrid"
+  ) {
+    return "Hybrid";
+  }
+
+  if (
+    scanMode ===
+    "source-code"
+  ) {
+    return "Source Code";
+  }
+
+  return "Runtime";
+}
+
+function deriveLegacyScanMode(
+  scan,
+) {
+  if (scan?.scanMode) {
+    return scan.scanMode;
+  }
+
+  const options =
+    scan?.scanOptions ?? {};
+
+  const hasRuntimeChecks =
+    options.cookies === true ||
+    options.networkRequests ===
+      true ||
+    options.browserStorage ===
+      true;
+
+  const hasSourceCodeCheck =
+    options.sourceCode === true;
+
+  if (
+    hasRuntimeChecks &&
+    hasSourceCodeCheck
+  ) {
+    return "hybrid";
+  }
+
+  if (hasSourceCodeCheck) {
+    return "source-code";
+  }
+
+  return "runtime";
+}
+
 function ScanResultsPage() {
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
+
   const [searchParams] =
     useSearchParams();
 
@@ -144,11 +221,17 @@ function ScanResultsPage() {
   const [scan, setScan] =
     useState(null);
 
-  const [isLoading, setIsLoading] =
-    useState(Boolean(scanId));
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(
+    Boolean(scanId),
+  );
 
-  const [loadError, setLoadError] =
-    useState("");
+  const [
+    loadError,
+    setLoadError,
+  ] = useState("");
 
   const [
     activeModal,
@@ -160,25 +243,66 @@ function ScanResultsPage() {
     setSelectedFinding,
   ] = useState(null);
 
-  const findings = useMemo(
-    () =>
-      Array.isArray(scan?.findings)
-        ? scan.findings
-        : [],
-    [scan?.findings],
-  );
+  const findings =
+    useMemo(
+      () =>
+        Array.isArray(
+          scan?.findings,
+        )
+          ? scan.findings
+          : [],
+      [scan?.findings],
+    );
+
+  const correlations =
+    useMemo(
+      () =>
+        Array.isArray(
+          scan?.correlations,
+        )
+          ? scan.correlations
+          : [],
+      [scan?.correlations],
+    );
+
+  const scanMode =
+    useMemo(
+      () =>
+        deriveLegacyScanMode(
+          scan,
+        ),
+      [scan],
+    );
 
   const findingsSummary =
     useMemo(() => {
       const fallbackSummary =
-        buildFallbackSummary(findings);
+        buildFallbackSummary(
+          findings,
+        );
 
       return {
         ...fallbackSummary,
         ...(scan?.findingsSummary ??
           {}),
+
+        correlations:
+          scan?.findingsSummary
+            ?.correlations ??
+          correlations.length,
+
+        highConfidenceCorrelations:
+          scan?.findingsSummary
+            ?.highConfidenceCorrelations ??
+          correlations.filter(
+            (correlation) =>
+              correlation
+                ?.confidence ===
+              "high",
+          ).length,
       };
     }, [
+      correlations,
       findings,
       scan?.findingsSummary,
     ]);
@@ -193,7 +317,7 @@ function ScanResultsPage() {
       ];
 
       if (
-        options.cookies !== false
+        options.cookies === true
       ) {
         tabs.push(
           "Cookies",
@@ -201,8 +325,8 @@ function ScanResultsPage() {
       }
 
       if (
-        options.networkRequests !==
-        false
+        options.networkRequests ===
+        true
       ) {
         tabs.push(
           "Network",
@@ -210,8 +334,8 @@ function ScanResultsPage() {
       }
 
       if (
-        options.browserStorage !==
-        false
+        options.browserStorage ===
+        true
       ) {
         tabs.push(
           "Storage",
@@ -227,6 +351,15 @@ function ScanResultsPage() {
       }
 
       if (
+        scanMode === "hybrid" &&
+        correlations.length > 0
+      ) {
+        tabs.push(
+          "Correlations",
+        );
+      }
+
+      if (
         findings.length > 0
       ) {
         tabs.push(
@@ -236,8 +369,10 @@ function ScanResultsPage() {
 
       return tabs;
     }, [
+      correlations.length,
       findings.length,
       scan?.scanOptions,
+      scanMode,
     ]);
 
   const overallStatus =
@@ -260,14 +395,19 @@ function ScanResultsPage() {
       return undefined;
     }
 
-    let componentMounted = true;
+    let componentMounted =
+      true;
 
     async function loadScan() {
       try {
         const data =
-          await getScan(scanId);
+          await getScan(
+            scanId,
+          );
 
-        if (!componentMounted) {
+        if (
+          !componentMounted
+        ) {
           return;
         }
 
@@ -277,10 +417,15 @@ function ScanResultsPage() {
           );
         }
 
-        setScan(data.scan);
+        setScan(
+          data.scan,
+        );
+
         setLoadError("");
       } catch (error) {
-        if (!componentMounted) {
+        if (
+          !componentMounted
+        ) {
           return;
         }
 
@@ -289,8 +434,12 @@ function ScanResultsPage() {
             "Unable to load the scan results.",
         );
       } finally {
-        if (componentMounted) {
-          setIsLoading(false);
+        if (
+          componentMounted
+        ) {
+          setIsLoading(
+            false,
+          );
         }
       }
     }
@@ -298,14 +447,17 @@ function ScanResultsPage() {
     loadScan();
 
     return () => {
-      componentMounted = false;
+      componentMounted =
+        false;
     };
   }, [scanId]);
 
   const closeAllModals =
     useCallback(() => {
       setActiveModal(null);
-      setSelectedFinding(null);
+      setSelectedFinding(
+        null,
+      );
     }, []);
 
   useEffect(() => {
@@ -314,8 +466,13 @@ function ScanResultsPage() {
         ? "hidden"
         : "";
 
-    function closeWithEscape(event) {
-      if (event.key === "Escape") {
+    function closeWithEscape(
+      event,
+    ) {
+      if (
+        event.key ===
+        "Escape"
+      ) {
         closeAllModals();
       }
     }
@@ -339,8 +496,12 @@ function ScanResultsPage() {
     isModalOpen,
   ]);
 
-  function openModal(modalName) {
+  function openModal(
+    modalName,
+  ) {
     if (
+      modalName !==
+        "Export report" &&
       !enabledResultTabs.includes(
         modalName,
       )
@@ -348,14 +509,22 @@ function ScanResultsPage() {
       return;
     }
 
-    setSelectedFinding(null);
-    setActiveModal(modalName);
+    setSelectedFinding(
+      null,
+    );
+
+    setActiveModal(
+      modalName,
+    );
   }
 
   function openFindingGuidance(
     finding,
   ) {
-    setSelectedFinding(finding);
+    setSelectedFinding(
+      finding,
+    );
+
     setActiveModal(
       "Fix guidance",
     );
@@ -365,18 +534,22 @@ function ScanResultsPage() {
     navigate("/new-scan", {
       state: {
         targetUrl:
-          scan?.targetUrl ?? "",
+          scan?.targetUrl ??
+          "",
 
         consentAction:
-          scan?.consentAction ??
+          scan
+            ?.consentAction ??
           "reject",
 
         acceptSelector:
-          scan?.acceptSelector ??
+          scan
+            ?.acceptSelector ??
           "#accept-all",
 
         rejectSelector:
-          scan?.rejectSelector ??
+          scan
+            ?.rejectSelector ??
           "#reject-all",
 
         browser:
@@ -388,8 +561,9 @@ function ScanResultsPage() {
           3000,
 
         sourceFolder:
-          scan?.sourceCodeFolder ??
-          "./src",
+          scan
+            ?.sourceCodeFolder ??
+          "",
 
         necessaryCookieAllowlist:
           scan
@@ -408,9 +582,8 @@ function ScanResultsPage() {
   }
 
   function handleExportReport() {
-    console.log(
-      "Export report for scan:",
-      scan?._id,
+    openModal(
+      "Export report",
     );
   }
 
@@ -477,6 +650,24 @@ function ScanResultsPage() {
     );
   }
 
+  const resultTarget =
+    scanMode ===
+    "source-code"
+      ? scan
+          ?.sourceCodeFolder ||
+        "Unknown source folder"
+      : scan?.targetUrl ||
+        "Unknown target";
+
+  const canExport =
+    scan?.status ===
+      "completed" ||
+    (
+      scan?.status ===
+        "failed" &&
+      findings.length > 0
+    );
+
   return (
     <DashboardLayout
       activePage="New Scan"
@@ -493,8 +684,7 @@ function ScanResultsPage() {
           </h2>
 
           <div className="scan-result-url">
-            {scan?.targetUrl ||
-              "Unknown target"}
+            {resultTarget}
           </div>
 
           <div className="scan-overall-status">
@@ -531,13 +721,26 @@ function ScanResultsPage() {
 
           <div className="scan-result-details">
             <span>
-              Consent action:{" "}
+              Scan mode:{" "}
               <strong>
-                {getConsentActionLabel(
-                  scan?.consentAction,
+                {getScanModeLabel(
+                  scanMode,
                 )}
               </strong>
             </span>
+
+            {scanMode !==
+              "source-code" && (
+              <span>
+                Consent action:{" "}
+                <strong>
+                  {getConsentActionLabel(
+                    scan
+                      ?.consentAction,
+                  )}
+                </strong>
+              </span>
+            )}
 
             <span>
               Findings:{" "}
@@ -546,6 +749,18 @@ function ScanResultsPage() {
                   findings.length}
               </strong>
             </span>
+
+            {scanMode ===
+              "hybrid" && (
+              <span>
+                Correlations:{" "}
+                <strong>
+                  {
+                    correlations.length
+                  }
+                </strong>
+              </span>
+            )}
           </div>
 
           <div className="scan-result-actions">
@@ -560,6 +775,14 @@ function ScanResultsPage() {
 
             <button
               type="button"
+              disabled={
+                !canExport
+              }
+              title={
+                canExport
+                  ? "Export this scan"
+                  : "Reports are available after a scan has completed"
+              }
               onClick={
                 handleExportReport
               }
@@ -606,7 +829,9 @@ function ScanResultsPage() {
                     }
                     key={tab}
                     onClick={() =>
-                      openModal(tab)
+                      openModal(
+                        tab,
+                      )
                     }
                   >
                     {tab}
@@ -705,6 +930,22 @@ function ScanResultsPage() {
       )}
 
       {activeModal ===
+        "Correlations" && (
+        <CorrelationFindingsModal
+          correlations={
+            correlations
+          }
+          findings={findings}
+          onClose={
+            closeAllModals
+          }
+          onViewFinding={
+            openFindingGuidance
+          }
+        />
+      )}
+
+      {activeModal ===
         "Fix guidance" && (
         <FixGuidanceModal
           scan={scan}
@@ -720,6 +961,16 @@ function ScanResultsPage() {
           }
           onExportResults={
             handleExportReport
+          }
+        />
+      )}
+
+      {activeModal ===
+        "Export report" && (
+        <ExportReportModal
+          scan={scan}
+          onClose={
+            closeAllModals
           }
         />
       )}
