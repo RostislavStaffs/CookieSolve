@@ -31,13 +31,14 @@ const SUSPICIOUS_REQUEST_KEYWORDS = [
   "amplitude",
 ];
 
-const IGNORED_RESOURCE_TYPES = new Set([
-  "document",
-  "stylesheet",
-  "font",
-  "image",
-  "media",
-]);
+const IGNORED_RESOURCE_TYPES =
+  new Set([
+    "document",
+    "stylesheet",
+    "font",
+    "image",
+    "media",
+  ]);
 
 function normalise(value) {
   return String(value ?? "")
@@ -45,7 +46,9 @@ function normalise(value) {
     .toLowerCase();
 }
 
-function createCookieIdentifier(cookie) {
+function createCookieIdentifier(
+  cookie,
+) {
   return [
     normalise(cookie.name),
     normalise(cookie.domain),
@@ -53,7 +56,9 @@ function createCookieIdentifier(cookie) {
   ].join("|");
 }
 
-function createStorageIdentifier(item) {
+function createStorageIdentifier(
+  item,
+) {
   return [
     normalise(item.origin),
     normalise(item.storageType),
@@ -67,7 +72,8 @@ function isConsentStorageKey(key) {
 
   return DEFAULT_CONSENT_STORAGE_KEYS.some(
     (consentKey) =>
-      normalisedKey === consentKey ||
+      normalisedKey ===
+        consentKey ||
       normalisedKey.includes(
         consentKey,
       ),
@@ -83,17 +89,17 @@ function isAllowlistedCookie(
 
   return allowlist.some(
     (allowedName) =>
-      normalise(allowedName) ===
-      cookieName,
+      normalise(
+        allowedName,
+      ) === cookieName,
   );
 }
 
 function requestContainsSuspiciousKeyword(
   request,
 ) {
-  const url = normalise(
-    request.url,
-  );
+  const url =
+    normalise(request.url);
 
   return SUSPICIOUS_REQUEST_KEYWORDS.some(
     (keyword) =>
@@ -101,7 +107,9 @@ function requestContainsSuspiciousKeyword(
   );
 }
 
-function isSuspiciousRequest(request) {
+function isSuspiciousRequest(
+  request,
+) {
   if (request.isThirdParty) {
     return true;
   }
@@ -189,9 +197,11 @@ function analysePreConsentCookies({
           domain: cookie.domain,
           path: cookie.path,
           expires: cookie.expires,
-          httpOnly: cookie.httpOnly,
+          httpOnly:
+            cookie.httpOnly,
           secure: cookie.secure,
-          sameSite: cookie.sameSite,
+          sameSite:
+            cookie.sameSite,
         },
       }),
     );
@@ -243,7 +253,8 @@ function analysePostRejectionCookies({
       findings.push(
         createFinding({
           category: "cookie",
-          phase: "post-rejection",
+          phase:
+            "post-rejection",
           type:
             "cookie-persisted-after-rejection",
           severity: "high",
@@ -259,7 +270,8 @@ function analysePostRejectionCookies({
               existingCookie.value,
             domain: cookie.domain,
             path: cookie.path,
-            expires: cookie.expires,
+            expires:
+              cookie.expires,
             httpOnly:
               cookie.httpOnly,
             secure: cookie.secure,
@@ -275,7 +287,8 @@ function analysePostRejectionCookies({
     findings.push(
       createFinding({
         category: "cookie",
-        phase: "post-rejection",
+        phase:
+          "post-rejection",
         type:
           "cookie-created-after-rejection",
         severity: "high",
@@ -290,9 +303,11 @@ function analysePostRejectionCookies({
           domain: cookie.domain,
           path: cookie.path,
           expires: cookie.expires,
-          httpOnly: cookie.httpOnly,
+          httpOnly:
+            cookie.httpOnly,
           secure: cookie.secure,
-          sameSite: cookie.sameSite,
+          sameSite:
+            cookie.sameSite,
         },
       }),
     );
@@ -409,7 +424,8 @@ function analysePostRejectionStorage({
       createFinding({
         category:
           "browser-storage",
-        phase: "post-rejection",
+        phase:
+          "post-rejection",
         type:
           "storage-created-after-rejection",
         severity: "medium",
@@ -437,10 +453,13 @@ function analyseRequests({
   phase,
 }) {
   return requests
-    .filter(isSuspiciousRequest)
+    .filter(
+      isSuspiciousRequest,
+    )
     .map((request) => {
       const beforeConsent =
-        phase === "pre-consent";
+        phase ===
+        "pre-consent";
 
       return createFinding({
         category: "network",
@@ -476,28 +495,44 @@ function analyseRequests({
     });
 }
 
-function buildSummary(findings) {
+export function buildFindingsSummary(
+  findings = [],
+) {
+  const safeFindings =
+    Array.isArray(findings)
+      ? findings
+      : [];
+
   const summary = {
-    total: findings.length,
+    total:
+      safeFindings.length,
+
     high: 0,
     medium: 0,
     low: 0,
+
     cookies: 0,
     network: 0,
     browserStorage: 0,
     sourceCode: 0,
+
     preConsent: 0,
     postRejection: 0,
     postAcceptance: 0,
   };
 
-  for (const finding of findings) {
+  for (
+    const finding of
+    safeFindings
+  ) {
     if (
-      Object.prototype
-        .hasOwnProperty.call(
-          summary,
-          finding.severity,
-        )
+      [
+        "high",
+        "medium",
+        "low",
+      ].includes(
+        finding.severity,
+      )
     ) {
       summary[
         finding.severity
@@ -569,13 +604,16 @@ export function analyseRuntimeFindings({
       scanOptions.cookies !== false,
 
     networkRequests:
-      scanOptions.networkRequests !== false,
+      scanOptions
+        .networkRequests !== false,
 
     browserStorage:
-      scanOptions.browserStorage !== false,
+      scanOptions
+        .browserStorage !== false,
 
     sourceCode:
-      scanOptions.sourceCode === true,
+      scanOptions.sourceCode ===
+      true,
   };
 
   const safePreConsent = {
@@ -606,10 +644,6 @@ export function analyseRuntimeFindings({
 
   const findings = [];
 
-  /*
-   * Pre-consent activity is relevant for both
-   * Accept All and Reject All scans.
-   */
   if (
     resolvedScanOptions.cookies
   ) {
@@ -645,17 +679,15 @@ export function analyseRuntimeFindings({
           safePreConsent
             .networkRequests,
 
-        phase: "pre-consent",
+        phase:
+          "pre-consent",
       }),
     );
   }
 
   /*
-   * Activity after acceptance is expected and
-   * must not be labelled as a rejection violation.
-   *
-   * Post-action violation analysis therefore only
-   * applies when Reject All was selected.
+   * Post-action data is classified as a
+   * violation only for Reject All scans.
    */
   if (
     consentAction === "reject"
@@ -713,6 +745,8 @@ export function analyseRuntimeFindings({
   return {
     findings,
     summary:
-      buildSummary(findings),
+      buildFindingsSummary(
+        findings,
+      ),
   };
 }
