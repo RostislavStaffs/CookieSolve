@@ -1,51 +1,52 @@
 import mongoose from "mongoose";
 
-const cookieSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-    },
+const cookieSchema =
+  new mongoose.Schema(
+    {
+      name: {
+        type: String,
+        required: true,
+      },
 
-    value: {
-      type: String,
-      default: "",
-    },
+      value: {
+        type: String,
+        default: "",
+      },
 
-    domain: {
-      type: String,
-      default: "",
-    },
+      domain: {
+        type: String,
+        default: "",
+      },
 
-    path: {
-      type: String,
-      default: "/",
-    },
+      path: {
+        type: String,
+        default: "/",
+      },
 
-    expires: {
-      type: Number,
-      default: -1,
-    },
+      expires: {
+        type: Number,
+        default: -1,
+      },
 
-    httpOnly: {
-      type: Boolean,
-      default: false,
-    },
+      httpOnly: {
+        type: Boolean,
+        default: false,
+      },
 
-    secure: {
-      type: Boolean,
-      default: false,
-    },
+      secure: {
+        type: Boolean,
+        default: false,
+      },
 
-    sameSite: {
-      type: String,
-      default: "",
+      sameSite: {
+        type: String,
+        default: "",
+      },
     },
-  },
-  {
-    _id: false,
-  },
-);
+    {
+      _id: false,
+    },
+  );
 
 const networkRequestSchema =
   new mongoose.Schema(
@@ -126,12 +127,16 @@ const runtimePhaseSchema =
       },
 
       networkRequests: {
-        type: [networkRequestSchema],
+        type: [
+          networkRequestSchema,
+        ],
         default: [],
       },
 
       browserStorage: {
-        type: [browserStorageSchema],
+        type: [
+          browserStorageSchema,
+        ],
         default: [],
       },
     },
@@ -191,8 +196,86 @@ const findingSchema =
       },
 
       evidence: {
-        type: mongoose.Schema.Types.Mixed,
+        type:
+          mongoose.Schema.Types
+            .Mixed,
         default: {},
+      },
+    },
+    {
+      timestamps: true,
+    },
+  );
+
+const correlationSchema =
+  new mongoose.Schema(
+    {
+      runtimeFindingIndex: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+
+      sourceFindingIndex: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+
+      runtimeFindingType: {
+        type: String,
+        required: true,
+      },
+
+      sourceFindingType: {
+        type: String,
+        required: true,
+      },
+
+      runtimeTitle: {
+        type: String,
+        required: true,
+      },
+
+      sourceTitle: {
+        type: String,
+        required: true,
+      },
+
+      sourceFile: {
+        type: String,
+        default: "",
+      },
+
+      sourceLine: {
+        type: Number,
+        default: null,
+      },
+
+      confidence: {
+        type: String,
+        enum: [
+          "high",
+          "medium",
+          "low",
+        ],
+        required: true,
+      },
+
+      score: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+
+      matchedIndicators: {
+        type: [String],
+        default: [],
+      },
+
+      explanation: {
+        type: String,
+        required: true,
       },
     },
     {
@@ -257,6 +340,16 @@ const findingsSummarySchema =
         type: Number,
         default: 0,
       },
+
+      correlations: {
+        type: Number,
+        default: 0,
+      },
+
+      highConfidenceCorrelations: {
+        type: Number,
+        default: 0,
+      },
     },
     {
       _id: false,
@@ -296,159 +389,186 @@ const legacySummarySchema =
     },
   );
 
-const scanSchema = new mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-
-    targetUrl: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    consentAction: {
-      type: String,
-      enum: ["accept", "reject"],
-      default: "reject",
-    },
-
-    acceptSelector: {
-      type: String,
-      default: "#accept-all",
-      trim: true,
-    },
-
-    rejectSelector: {
-      type: String,
-      default: "#reject-all",
-      trim: true,
-    },
-
-    browser: {
-      type: String,
-      enum: [
-        "chromium",
-        "firefox",
-        "webkit",
-      ],
-      default: "chromium",
-    },
-
-    waitTime: {
-      type: Number,
-      min: 0,
-      max: 30000,
-      default: 1500,
-    },
-
-    necessaryCookieAllowlist: {
-      type: [String],
-      default: [],
-    },
-
-    scanOptions: {
-      cookies: {
-        type: Boolean,
-        default: true,
+const scanSchema =
+  new mongoose.Schema(
+    {
+      user: {
+        type:
+          mongoose.Schema.Types
+            .ObjectId,
+        ref: "User",
+        required: true,
+        index: true,
       },
 
-      networkRequests: {
-        type: Boolean,
-        default: true,
+      scanMode: {
+        type: String,
+        enum: [
+          "runtime",
+          "source-code",
+          "hybrid",
+        ],
+        required: true,
+        default: "runtime",
       },
 
-      browserStorage: {
-        type: Boolean,
-        default: true,
+      /*
+       * A URL is required by the controller only
+       * for runtime and hybrid scans.
+       */
+      targetUrl: {
+        type: String,
+        default: "",
+        trim: true,
       },
 
-      sourceCode: {
-        type: Boolean,
-        default: false,
+      consentAction: {
+        type: String,
+        enum: [
+          "accept",
+          "reject",
+        ],
+        default: "reject",
+      },
+
+      acceptSelector: {
+        type: String,
+        default: "#accept-all",
+        trim: true,
+      },
+
+      rejectSelector: {
+        type: String,
+        default: "#reject-all",
+        trim: true,
+      },
+
+      browser: {
+        type: String,
+        enum: [
+          "chromium",
+          "firefox",
+          "webkit",
+        ],
+        default: "chromium",
+      },
+
+      waitTime: {
+        type: Number,
+        min: 0,
+        max: 30000,
+        default: 1500,
+      },
+
+      necessaryCookieAllowlist: {
+        type: [String],
+        default: [],
+      },
+
+      scanOptions: {
+        cookies: {
+          type: Boolean,
+          default: true,
+        },
+
+        networkRequests: {
+          type: Boolean,
+          default: true,
+        },
+
+        browserStorage: {
+          type: Boolean,
+          default: true,
+        },
+
+        sourceCode: {
+          type: Boolean,
+          default: false,
+        },
+      },
+
+      sourceCodeFolder: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+
+      status: {
+        type: String,
+        enum: [
+          "pending",
+          "running",
+          "completed",
+          "failed",
+        ],
+        default: "pending",
+        index: true,
+      },
+
+      currentStep: {
+        type: String,
+        default:
+          "Waiting to start",
+      },
+
+      errorMessage: {
+        type: String,
+        default: "",
+      },
+
+      preConsent: {
+        type: runtimePhaseSchema,
+        default: () => ({}),
+      },
+
+      postAction: {
+        type: runtimePhaseSchema,
+        default: () => ({}),
+      },
+
+      postRejection: {
+        type: runtimePhaseSchema,
+        default: () => ({}),
+      },
+
+      findings: {
+        type: [findingSchema],
+        default: [],
+      },
+
+      correlations: {
+        type: [
+          correlationSchema,
+        ],
+        default: [],
+      },
+
+      findingsSummary: {
+        type:
+          findingsSummarySchema,
+        default: () => ({}),
+      },
+
+      summary: {
+        type:
+          legacySummarySchema,
+        default: () => ({}),
+      },
+
+      startedAt: {
+        type: Date,
+        default: null,
+      },
+
+      completedAt: {
+        type: Date,
+        default: null,
       },
     },
-
-    sourceCodeFolder: {
-      type: String,
-      default: "",
-      trim: true,
+    {
+      timestamps: true,
     },
-
-    status: {
-      type: String,
-      enum: [
-        "pending",
-        "running",
-        "completed",
-        "failed",
-      ],
-      default: "pending",
-      index: true,
-    },
-
-    currentStep: {
-      type: String,
-      default: "Waiting to start",
-    },
-
-    errorMessage: {
-      type: String,
-      default: "",
-    },
-
-    preConsent: {
-      type: runtimePhaseSchema,
-      default: () => ({}),
-    },
-
-    postAction: {
-      type: runtimePhaseSchema,
-      default: () => ({}),
-    },
-
-    /*
-     * Retained for compatibility with existing
-     * records and frontend code.
-     */
-    postRejection: {
-      type: runtimePhaseSchema,
-      default: () => ({}),
-    },
-
-    findings: {
-      type: [findingSchema],
-      default: [],
-    },
-
-    findingsSummary: {
-      type: findingsSummarySchema,
-      default: () => ({}),
-    },
-
-    summary: {
-      type: legacySummarySchema,
-      default: () => ({}),
-    },
-
-    startedAt: {
-      type: Date,
-      default: null,
-    },
-
-    completedAt: {
-      type: Date,
-      default: null,
-    },
-  },
-  {
-    timestamps: true,
-  },
-);
+  );
 
 scanSchema.index({
   user: 1,
