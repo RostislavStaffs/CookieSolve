@@ -1,0 +1,253 @@
+.delete-scan-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+
+  padding: 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(3, 3, 6, 0.82);
+  backdrop-filter: blur(2px);
+
+  animation: deleteScanBackdropReveal 180ms ease forwards;
+}
+
+.delete-scan-modal {
+  width: min(100%, 430px);
+  padding: 31px 32px 28px;
+
+  border: 1px solid rgba(255, 92, 108, 0.15);
+  border-radius: 20px;
+
+  background: #17161c;
+  color: #ffffff;
+
+  text-align: center;
+
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(225, 53, 72, 0.06);
+
+  opacity: 0;
+  transform: translateY(14px) scale(0.985);
+
+  animation: deleteScanModalReveal 280ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    forwards;
+}
+
+.delete-scan-icon {
+  width: 53px;
+  height: 53px;
+  margin: 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid rgba(239, 75, 92, 0.24);
+  border-radius: 16px;
+
+  background: rgba(216, 48, 67, 0.1);
+  color: #ff7786;
+}
+
+.delete-scan-icon svg {
+  width: 25px;
+  height: 25px;
+
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.delete-scan-modal h2 {
+  margin: 18px 0 0;
+
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.delete-scan-modal > p {
+  max-width: 340px;
+  margin: 10px auto 0;
+
+  color: #96959e;
+
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.delete-scan-target {
+  margin-top: 21px;
+  padding: 13px 15px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+
+  background: #111015;
+
+  text-align: left;
+}
+
+.delete-scan-target span {
+  color: #85848d;
+
+  font-size: 12px;
+}
+
+.delete-scan-target code {
+  max-width: 245px;
+  overflow: hidden;
+
+  color: #b2bbff;
+
+  font-family: inherit;
+  font-size: 13px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-scan-error {
+  margin-top: 15px;
+  padding: 10px 12px;
+
+  border: 1px solid rgba(239, 75, 92, 0.2);
+  border-radius: 9px;
+
+  background: rgba(216, 48, 67, 0.08);
+  color: #ff8995;
+
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.delete-scan-actions {
+  margin-top: 24px;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.delete-scan-actions button {
+  min-height: 41px;
+  padding: 8px 16px;
+
+  border-radius: 11px;
+
+  font-size: 13px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.delete-scan-actions button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.delete-scan-cancel {
+  border: 1px solid rgba(255, 255, 255, 0.11);
+
+  background: rgba(255, 255, 255, 0.035);
+  color: #d8d7dd;
+}
+
+.delete-scan-cancel:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.2);
+
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+
+  transform: translateY(-1px);
+}
+
+.delete-scan-confirm {
+  border: 1px solid rgba(239, 75, 92, 0.3);
+
+  background: #cf3042;
+  color: #ffffff;
+}
+
+.delete-scan-confirm:hover:not(:disabled) {
+  background: #df3a4c;
+
+  box-shadow:
+    0 0 12px rgba(222, 53, 72, 0.26);
+
+  transform: translateY(-1px);
+}
+
+.delete-scan-actions button:focus-visible {
+  outline: 2px solid #98a5ff;
+  outline-offset: 3px;
+}
+
+@keyframes deleteScanBackdropReveal {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes deleteScanModalReveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 500px) {
+  .delete-scan-backdrop {
+    padding: 15px;
+  }
+
+  .delete-scan-modal {
+    padding: 27px 21px 23px;
+  }
+
+  .delete-scan-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .delete-scan-backdrop,
+  .delete-scan-modal {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+
+  .delete-scan-actions button {
+    transition: none;
+  }
+}

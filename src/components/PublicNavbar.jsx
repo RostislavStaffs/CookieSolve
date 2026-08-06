@@ -15,7 +15,9 @@ function PublicNavbar() {
       </button>
 
       <nav className="public-navigation" aria-label="Main navigation">
-        <button className="navigation-link" type="button">
+        <button className="navigation-link" type="button"
+          onClick={() => navigate("/about")}
+        >
           About us
         </button>
 

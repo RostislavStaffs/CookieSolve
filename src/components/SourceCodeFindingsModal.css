@@ -1,39 +1,49 @@
 .source-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 110;
+  z-index: 150;
+
+  padding: 24px;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
-  padding: 24px;
+  background: rgba(3, 3, 6, 0.82);
+  backdrop-filter: blur(3px);
 
-  background: rgba(3, 3, 6, 0.8);
-  backdrop-filter: blur(2px);
-
-  animation: sourceBackdropReveal 220ms ease forwards;
+  animation: sourceBackdropReveal 200ms ease
+    forwards;
 }
 
 .source-findings-modal {
-  width: min(100%, 790px);
-  padding: 34px 36px 28px;
+  width: min(1180px, 100%);
+  max-height: calc(100vh - 48px);
+  padding: 32px 34px 24px;
 
-  border: 1px solid rgba(90, 105, 210, 0.12);
+  overflow-y: auto;
+
+  border: 1px solid
+    rgba(90, 105, 210, 0.15);
   border-radius: 22px;
 
   background: #17161c;
   color: #ffffff;
 
   box-shadow:
-    0 26px 70px rgba(0, 0, 0, 0.48),
-    0 0 34px rgba(58, 76, 191, 0.07);
+    0 28px 75px
+      rgba(0, 0, 0, 0.52),
+    0 0 36px
+      rgba(58, 76, 191, 0.08);
 
   opacity: 0;
-  transform: translateY(16px) scale(0.985);
+  transform:
+    translateY(16px)
+    scale(0.985);
 
-  animation: sourceModalReveal 320ms
-    cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: sourceModalReveal 300ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    forwards;
 }
 
 .source-modal-header {
@@ -41,6 +51,18 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 30px;
+}
+
+.source-modal-eyebrow {
+  display: block;
+  margin-bottom: 7px;
+
+  color: #8291ff;
+
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
 }
 
 .source-modal-header h2 {
@@ -53,13 +75,18 @@
 }
 
 .source-modal-header p {
-  max-width: 540px;
+  max-width: 680px;
   margin: 8px 0 0;
 
   color: #98979f;
 
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
+}
+
+.source-modal-header p strong {
+  color: #c7c6cd;
+  font-weight: 500;
 }
 
 .source-modal-close {
@@ -85,7 +112,7 @@
   top: 16px;
   left: 2px;
 
-  width: 32px;
+  width: 31px;
   height: 2px;
 
   border-radius: 2px;
@@ -101,21 +128,16 @@
 }
 
 .source-modal-close:hover {
-  opacity: 0.75;
+  opacity: 0.72;
   transform: rotate(4deg);
 }
 
-.source-modal-close:focus-visible {
-  outline: 2px solid #98a5ff;
-  outline-offset: 3px;
-  border-radius: 6px;
-}
-
 .source-table-wrapper {
-  margin-top: 31px;
+  margin-top: 28px;
   overflow-x: auto;
 
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid
+    rgba(255, 255, 255, 0.1);
   border-radius: 14px;
 
   background: #121116;
@@ -123,63 +145,90 @@
 
 .source-findings-table {
   width: 100%;
+  min-width: 1030px;
+
   border-collapse: collapse;
 
   color: #f2f1f4;
 
-  font-size: 14px;
+  font-size: 13px;
   text-align: left;
 }
 
 .source-findings-table th {
-  padding: 15px 16px;
+  padding: 14px 15px;
 
   background: #1d1c23;
   color: #d9d8df;
 
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
+
   white-space: nowrap;
 }
 
 .source-findings-table td {
-  padding: 16px;
+  padding: 15px;
 
-  border-top: 1px solid rgba(255, 255, 255, 0.075);
+  border-top: 1px solid
+    rgba(255, 255, 255, 0.075);
 
   color: #d8d7dc;
   vertical-align: middle;
 }
 
 .source-findings-table tbody tr {
-  transition: background-color 180ms ease;
+  transition:
+    background-color 180ms ease;
 }
 
 .source-findings-table tbody tr:nth-child(even) {
-  background: rgba(255, 255, 255, 0.016);
+  background:
+    rgba(255, 255, 255, 0.016);
 }
 
 .source-findings-table tbody tr:hover {
-  background: rgba(64, 85, 232, 0.07);
+  background:
+    rgba(64, 85, 232, 0.07);
 }
 
-.source-findings-table code {
+.source-rule-code,
+.source-file-code {
   display: inline-block;
-  max-width: 170px;
-  padding: 4px 8px;
-
   overflow: hidden;
 
-  border: 1px solid rgba(76, 96, 236, 0.18);
+  border: 1px solid
+    rgba(76, 96, 236, 0.18);
   border-radius: 6px;
 
-  background: rgba(61, 78, 190, 0.1);
+  background:
+    rgba(61, 78, 190, 0.1);
   color: #aab4ff;
 
-  font-family: inherit;
-  font-size: 13px;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.source-rule-code {
+  max-width: 185px;
+  padding: 4px 7px;
+
+  font-size: 10px;
+}
+
+.source-file-code {
+  max-width: 210px;
+  padding: 4px 8px;
+
+  font-size: 11px;
 }
 
 .source-line-number {
@@ -191,17 +240,49 @@
   align-items: center;
   justify-content: center;
 
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid
+    rgba(255, 255, 255, 0.09);
   border-radius: 7px;
 
-  background: rgba(255, 255, 255, 0.035);
+  background:
+    rgba(255, 255, 255, 0.035);
   color: #dedde3;
 
   font-size: 12px;
 }
 
+.source-issue-cell {
+  min-width: 230px;
+  max-width: 350px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.source-issue-cell strong {
+  color: #efedf3;
+
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.source-issue-cell small {
+  display: -webkit-box;
+  overflow: hidden;
+
+  color: #8e8d96;
+
+  font-size: 11px;
+  line-height: 1.45;
+
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .source-severity-badge {
-  min-width: 65px;
+  min-width: 67px;
   padding: 4px 9px;
 
   display: inline-flex;
@@ -210,20 +291,36 @@
 
   border-radius: 20px;
 
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
+  text-transform: capitalize;
 }
 
 .source-severity-badge.high {
-  border: 1px solid rgba(239, 47, 68, 0.3);
-  background: rgba(222, 37, 57, 0.12);
+  border: 1px solid
+    rgba(239, 47, 68, 0.3);
+
+  background:
+    rgba(222, 37, 57, 0.12);
   color: #ff7b89;
 }
 
 .source-severity-badge.medium {
-  border: 1px solid rgba(239, 166, 47, 0.28);
-  background: rgba(215, 139, 30, 0.11);
+  border: 1px solid
+    rgba(239, 166, 47, 0.28);
+
+  background:
+    rgba(215, 139, 30, 0.11);
   color: #f1bd6c;
+}
+
+.source-severity-badge.low {
+  border: 1px solid
+    rgba(74, 119, 239, 0.26);
+
+  background:
+    rgba(55, 82, 208, 0.11);
+  color: #97a7ff;
 }
 
 .source-view-button {
@@ -231,11 +328,12 @@
   border: 0;
 
   background: transparent;
-  color: #5670ff;
+  color: #647cff;
 
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
 
+  white-space: nowrap;
   cursor: pointer;
 
   transition:
@@ -244,21 +342,79 @@
 }
 
 .source-view-button:hover {
-  color: #8a9aff;
+  color: #9aa8ff;
   transform: translateX(2px);
 }
 
-.source-view-button:focus-visible {
-  outline: 2px solid #98a5ff;
-  outline-offset: 4px;
-  border-radius: 3px;
+.source-empty-state {
+  min-height: 260px;
+  margin-top: 27px;
+  padding: 35px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+
+  background: #121116;
+
+  text-align: center;
 }
 
-.source-modal-footer {
-  margin-top: 17px;
+.source-empty-icon {
+  width: 50px;
+  height: 50px;
 
   display: flex;
   align-items: center;
+  justify-content: center;
+
+  border: 1px solid
+    rgba(91, 109, 255, 0.2);
+  border-radius: 15px;
+
+  background:
+    rgba(65, 82, 194, 0.1);
+}
+
+.source-empty-icon svg {
+  width: 25px;
+  height: 25px;
+
+  fill: none;
+  stroke: #8997ff;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.source-empty-state h3 {
+  margin: 16px 0 0;
+
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.source-empty-state p {
+  max-width: 440px;
+  margin: 8px 0 0;
+
+  color: #8f8e97;
+
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.source-modal-footer {
+  margin-top: 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 24px;
 
   color: #85848d;
@@ -266,9 +422,65 @@
   font-size: 11px;
 }
 
+.source-modal-footer > div {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
 .source-modal-footer strong {
   color: #c7c6cd;
   font-weight: 500;
+}
+
+.source-modal-done-button {
+  min-width: 90px;
+  min-height: 35px;
+  padding: 6px 17px;
+  border: 0;
+  border-radius: 10px;
+
+  background: #3f55e8;
+  color: #ffffff;
+
+  font-size: 12px;
+
+  cursor: pointer;
+
+  transition:
+    background-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.source-modal-done-button:hover {
+  background: #4b61f4;
+
+  box-shadow:
+    0 0 14px
+      rgba(72, 92, 245, 0.25);
+
+  transform: translateY(-1px);
+}
+
+.source-modal-disclaimer {
+  margin: 17px 0 0;
+  padding-top: 14px;
+
+  border-top: 1px solid
+    rgba(255, 255, 255, 0.07);
+
+  color: #777680;
+
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.source-modal-close:focus-visible,
+.source-view-button:focus-visible,
+.source-modal-done-button:focus-visible {
+  outline: 2px solid #98a5ff;
+  outline-offset: 4px;
 }
 
 @keyframes sourceBackdropReveal {
@@ -284,39 +496,49 @@
 @keyframes sourceModalReveal {
   from {
     opacity: 0;
-    transform: translateY(16px) scale(0.985);
+
+    transform:
+      translateY(16px)
+      scale(0.985);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+
+    transform:
+      translateY(0)
+      scale(1);
   }
 }
 
 @media (max-width: 720px) {
-  .source-findings-modal {
-    padding: 26px 22px 24px;
-  }
-
-  .source-modal-header h2 {
-    font-size: 24px;
-  }
-
-  .source-modal-footer {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
-  }
-}
-
-@media (max-width: 560px) {
   .source-modal-backdrop {
     padding: 14px;
   }
 
-  .source-findings-table th,
-  .source-findings-table td {
-    padding: 13px 12px;
+  .source-findings-modal {
+    max-height:
+      calc(100vh - 28px);
+    padding: 26px 21px 22px;
+  }
+
+  .source-modal-header h2 {
+    font-size: 23px;
+  }
+
+  .source-modal-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .source-modal-footer > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .source-modal-done-button {
+    width: 100%;
   }
 }
 
@@ -325,12 +547,14 @@
   .source-findings-modal {
     opacity: 1;
     transform: none;
+
     animation: none;
   }
 
   .source-modal-close,
   .source-findings-table tbody tr,
-  .source-view-button {
+  .source-view-button,
+  .source-modal-done-button {
     transition: none;
   }
 }

@@ -1,14 +1,43 @@
+import {
+  useMemo,
+} from "react";
+
 import "./SourceCodeFindingsModal.css";
 
-function formatSeverity(severity) {
-  if (!severity) {
-    return "Unknown";
-  }
+function getSeverityClassName(
+  severity,
+) {
+  return String(
+    severity ?? "low",
+  )
+    .trim()
+    .toLowerCase();
+}
 
+function getRuleName(finding) {
   return (
-    severity.charAt(0).toUpperCase() +
-    severity.slice(1)
+    finding?.evidence?.ruleId ||
+    finding?.type ||
+    "SOURCE_CODE_FINDING"
   );
+}
+
+function getFilePath(finding) {
+  return (
+    finding?.evidence?.file ||
+    "Unknown file"
+  );
+}
+
+function getLineNumber(finding) {
+  const lineNumber =
+    finding?.evidence?.line;
+
+  return Number.isFinite(
+    Number(lineNumber),
+  )
+    ? Number(lineNumber)
+    : "—";
 }
 
 function SourceCodeFindingsModal({
@@ -18,24 +47,34 @@ function SourceCodeFindingsModal({
   onViewFinding,
 }) {
   const sourceCodeFindings =
-    findings.filter(
-      (finding) =>
-        finding.category ===
-        "source-code",
-    );
+    useMemo(() => {
+      if (!Array.isArray(findings)) {
+        return [];
+      }
 
-  const sourceScanningSelected =
-    scan?.scanOptions?.sourceCode ===
-    true;
-
-  const affectedFiles = new Set(
-    sourceCodeFindings
-      .map(
+      return findings.filter(
         (finding) =>
-          finding.evidence?.file,
-      )
-      .filter(Boolean),
-  ).size;
+          finding?.category ===
+          "source-code",
+      );
+    }, [findings]);
+
+  const affectedFiles =
+    useMemo(() => {
+      const files = new Set(
+        sourceCodeFindings
+          .map((finding) =>
+            getFilePath(finding),
+          )
+          .filter(
+            (file) =>
+              file !==
+              "Unknown file",
+          ),
+      );
+
+      return files.size;
+    }, [sourceCodeFindings]);
 
   return (
     <div
@@ -54,12 +93,21 @@ function SourceCodeFindingsModal({
       >
         <header className="source-modal-header">
           <div>
+            <span className="source-modal-eyebrow">
+              Static Analysis
+            </span>
+
             <h2 id="source-findings-title">
               Source Code Findings
             </h2>
 
             <p>
-              Source locations where tracking behaviour may run without an appropriate consent check.
+              Potential consent and tracking issues detected in{" "}
+              <strong>
+                {scan?.sourceCodeFolder ||
+                  "the selected source folder"}
+              </strong>
+              .
             </p>
           </div>
 
@@ -74,77 +122,112 @@ function SourceCodeFindingsModal({
           </button>
         </header>
 
-        <div className="source-table-wrapper">
-          <table className="source-findings-table">
-            <thead>
-              <tr>
-                <th scope="col">
-                  File
-                </th>
+        {sourceCodeFindings.length >
+        0 ? (
+          <div className="source-table-wrapper">
+            <table className="source-findings-table">
+              <thead>
+                <tr>
+                  <th scope="col">
+                    Rule
+                  </th>
 
-                <th scope="col">
-                  Line
-                </th>
+                  <th scope="col">
+                    File
+                  </th>
 
-                <th scope="col">
-                  Issue
-                </th>
+                  <th scope="col">
+                    Line
+                  </th>
 
-                <th scope="col">
-                  Severity
-                </th>
+                  <th scope="col">
+                    Issue
+                  </th>
 
-                <th scope="col">
-                  Action
-                </th>
-              </tr>
-            </thead>
+                  <th scope="col">
+                    Severity
+                  </th>
 
-            <tbody>
-              {sourceCodeFindings.length >
-              0 ? (
-                sourceCodeFindings.map(
-                  (finding, index) => {
-                    const evidence =
-                      finding.evidence ?? {};
+                  <th scope="col">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {sourceCodeFindings.map(
+                  (
+                    finding,
+                    index,
+                  ) => {
+                    const ruleName =
+                      getRuleName(
+                        finding,
+                      );
+
+                    const filePath =
+                      getFilePath(
+                        finding,
+                      );
+
+                    const lineNumber =
+                      getLineNumber(
+                        finding,
+                      );
 
                     return (
                       <tr
                         key={
-                          finding._id ??
-                          `${finding.type}-${index}`
+                          finding?._id ||
+                          `${ruleName}-${filePath}-${lineNumber}-${index}`
                         }
                       >
                         <td>
-                          <code>
-                            {evidence.file ??
-                              "Unknown file"}
+                          <code
+                            className="source-rule-code"
+                            title={ruleName}
+                          >
+                            {ruleName}
+                          </code>
+                        </td>
+
+                        <td>
+                          <code
+                            className="source-file-code"
+                            title={filePath}
+                          >
+                            {filePath}
                           </code>
                         </td>
 
                         <td>
                           <span className="source-line-number">
-                            {evidence.line ??
-                              "—"}
+                            {lineNumber}
                           </span>
                         </td>
 
                         <td>
-                          {finding.title}
+                          <div className="source-issue-cell">
+                            <strong>
+                              {finding?.title ||
+                                "Potential source-code issue"}
+                            </strong>
+
+                            <small>
+                              {finding?.description ||
+                                "Review this source-code pattern."}
+                            </small>
+                          </div>
                         </td>
 
                         <td>
                           <span
-                            className={`source-severity-badge ${
-                              finding.severity ===
-                              "high"
-                                ? "high"
-                                : "medium"
-                            }`}
+                            className={`source-severity-badge ${getSeverityClassName(
+                              finding?.severity,
+                            )}`}
                           >
-                            {formatSeverity(
-                              finding.severity,
-                            )}
+                            {finding?.severity ||
+                              "low"}
                           </span>
                         </td>
 
@@ -158,41 +241,68 @@ function SourceCodeFindingsModal({
                               )
                             }
                           >
-                            View
+                            View guidance
                           </button>
                         </td>
                       </tr>
                     );
                   },
-                )
-              ) : (
-                <tr>
-                  <td colSpan="5">
-                    {sourceScanningSelected
-                      ? "Source-code analysis has been selected, but the static analyser has not been implemented yet."
-                      : "Source-code analysis was not enabled for this scan."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="source-empty-state">
+            <div
+              className="source-empty-icon"
+              aria-hidden="true"
+            >
+              <svg viewBox="0 0 24 24">
+                <path d="M8 9 5 12l3 3M16 9l3 3-3 3M14 6l-4 12" />
+              </svg>
+            </div>
+
+            <h3>
+              No source-code findings
+            </h3>
+
+            <p>
+              The enabled static-analysis rules did not detect any potential issues for this scan.
+            </p>
+          </div>
+        )}
 
         <div className="source-modal-footer">
-          <span>
-            <strong>
-              {sourceCodeFindings.length}
-            </strong>{" "}
-            source-code findings
-          </span>
+          <div>
+            <span>
+              <strong>
+                {
+                  sourceCodeFindings.length
+                }
+              </strong>{" "}
+              source-code findings
+            </span>
 
-          <span>
-            <strong>
-              {affectedFiles}
-            </strong>{" "}
-            files affected
-          </span>
+            <span>
+              <strong>
+                {affectedFiles}
+              </strong>{" "}
+              files affected
+            </span>
+          </div>
+
+          <button
+            className="source-modal-done-button"
+            type="button"
+            onClick={onClose}
+          >
+            Close
+          </button>
         </div>
+
+        <p className="source-modal-disclaimer">
+          Static analysis identifies patterns that may require developer review. A finding does not independently establish legal non-compliance.
+        </p>
       </section>
     </div>
   );
