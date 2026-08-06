@@ -7,6 +7,12 @@ import {
   getScans,
 } from "../controllers/scanController.js";
 
+import {
+  downloadScanReport,
+  getExportedReports,
+  openExportedReport,
+} from "../controllers/reportController.js";
+
 import requireAuth from "../middleware/requireAuth.js";
 
 const scanRouter =
@@ -24,6 +30,29 @@ scanRouter.post(
 scanRouter.get(
   "/",
   getScans,
+);
+
+/*
+ * Exported report history.
+ *
+ * These routes must remain above /:scanId.
+ */
+scanRouter.get(
+  "/exports",
+  getExportedReports,
+);
+
+scanRouter.get(
+  "/exports/:reportId",
+  openExportedReport,
+);
+
+/*
+ * Generate and record a new export.
+ */
+scanRouter.get(
+  "/:scanId/report",
+  downloadScanReport,
 );
 
 scanRouter.get(
