@@ -138,19 +138,12 @@ const SOURCE_RULES = [
 
     patterns: [
       /googletagmanager\.com\/gtag\/js/i,
-
       /googletagmanager\.com\/gtm\.js/i,
-
       /google-analytics\.com\/analytics\.js/i,
-
       /connect\.facebook\.net\/.*fbevents\.js/i,
-
       /static\.hotjar\.com/i,
-
       /cdn\.segment\.com\/analytics/i,
-
       /cdn\.mxpnl\.com/i,
-
       /clarity\.ms\/tag/i,
     ],
   },
@@ -173,7 +166,6 @@ const SOURCE_RULES = [
 
     patterns: [
       /\bgtag\s*\(\s*["']config["']/i,
-
       /\bgtag\s*\(\s*["']event["']/i,
     ],
   },
@@ -196,7 +188,6 @@ const SOURCE_RULES = [
 
     patterns: [
       /\bdataLayer\b.*\bgtm\.start\b/i,
-
       /\bGTM-[A-Z0-9]+\b/i,
     ],
   },
@@ -219,7 +210,6 @@ const SOURCE_RULES = [
 
     patterns: [
       /\bfbq\s*\(\s*["']init["']/i,
-
       /\bfbq\s*\(\s*["']track["']/i,
     ],
   },
@@ -242,9 +232,7 @@ const SOURCE_RULES = [
 
     patterns: [
       /\bhj\s*\(\s*["']trigger["']/i,
-
       /\bhj\s*\(\s*["']identify["']/i,
-
       /\bhj\s*=\s*window\.hj/i,
     ],
   },
@@ -288,7 +276,6 @@ const SOURCE_RULES = [
 
     patterns: [
       /\blocalStorage\.setItem\s*\(/i,
-
       /\bwindow\.localStorage\.setItem\s*\(/i,
     ],
   },
@@ -311,7 +298,6 @@ const SOURCE_RULES = [
 
     patterns: [
       /\bsessionStorage\.setItem\s*\(/i,
-
       /\bwindow\.sessionStorage\.setItem\s*\(/i,
     ],
   },
@@ -334,9 +320,7 @@ const SOURCE_RULES = [
 
     patterns: [
       /createElement\s*\(\s*["']script["']\s*\)/i,
-
       /\.src\s*=\s*["']https?:\/\//i,
-
       /setAttribute\s*\(\s*["']src["']\s*,\s*["']https?:\/\//i,
     ],
   },
@@ -359,9 +343,7 @@ const SOURCE_RULES = [
 
     patterns: [
       /\bfetch\s*\([^)]*(analytics|tracking|collect|telemetry|pixel|beacon)/i,
-
       /\bXMLHttpRequest\b.*(analytics|tracking|collect|telemetry|pixel|beacon)/i,
-
       /\bnavigator\.sendBeacon\s*\(/i,
     ],
   },
@@ -383,8 +365,7 @@ function normalisePathSeparators(
 
 function getConfiguredSourceRoot() {
   const configuredRoot =
-    process.env
-      .SCAN_SOURCE_ROOT;
+    process.env.SCAN_SOURCE_ROOT;
 
   if (!configuredRoot) {
     throw new Error(
@@ -409,9 +390,7 @@ function getConfiguredSourceRoot() {
         ? path.join(
             process.env.HOME ??
               "",
-            cleanedRoot.slice(
-              2,
-            ),
+            cleanedRoot.slice(2),
           )
         : cleanedRoot;
 
@@ -473,8 +452,7 @@ function shouldIgnoreDirectory(
   directoryName,
 ) {
   return IGNORED_DIRECTORIES.has(
-    directoryName
-      .toLowerCase(),
+    directoryName.toLowerCase(),
   );
 }
 
@@ -507,9 +485,7 @@ async function collectSourceFiles(
       },
     );
 
-  for (
-    const entry of entries
-  ) {
+  for (const entry of entries) {
     if (
       collectedFiles.length >=
       MAX_FILES_PER_SCAN
@@ -628,10 +604,7 @@ function getEvidenceSnippet({
           snippetIndex +
           1;
 
-        return (
-          `${lineNumber}: ` +
-          line
-        );
+        return `${lineNumber}: ${line}`;
       },
     )
     .join("\n");
@@ -738,9 +711,7 @@ function extractFunctionName(
     /^\s*([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{/,
   ];
 
-  for (
-    const pattern of patterns
-  ) {
+  for (const pattern of patterns) {
     const match =
       String(line).match(
         pattern,
@@ -762,10 +733,7 @@ function extractConditionText(
       /\b(?:if|else\s+if|while)\s*\((.*)\)\s*\{?/,
     );
 
-  return (
-    match?.[1] ??
-    null
-  );
+  return match?.[1] ?? null;
 }
 
 function buildLineContexts(
@@ -1066,12 +1034,6 @@ function extractCalledFunctionNames(
   return names;
 }
 
-/*
- * Builds one call index for every scanned file.
- *
- * This allows a function declared in analytics.js
- * to be matched with a guarded call in app.js.
- */
 function buildProjectFunctionCallIndex(
   sourceRecords,
 ) {
@@ -1113,10 +1075,6 @@ function buildProjectFunctionCallIndex(
             line,
           );
 
-        /*
-         * Do not mistake a function
-         * declaration for a function call.
-         */
         if (
           declaredFunctionName ===
           functionName
@@ -1400,17 +1358,24 @@ function createFindingDescription({
   lineNumber,
   context,
   execution,
+  reviewOnly,
 }) {
   const functionText =
     context.functionName
       ? ` The operation is inside the function "${context.functionName}".`
       : " The operation appears at module or document scope.";
 
+  const reviewText =
+    reviewOnly
+      ? " Static analysis could not confirm that this operation executes outside consent controls, so manual review is recommended."
+      : "";
+
   return (
     `${rule.description} Found in ` +
     `"${relativeFilePath}" at line ${lineNumber}.` +
     functionText +
-    ` ${execution.reason}`
+    ` ${execution.reason}` +
+    reviewText
   );
 }
 
@@ -1492,9 +1457,6 @@ function analyseSourceLine({
       continue;
     }
 
-    /*
-     * Cookie cleanup is not cookie creation.
-     */
     if (
       rule.ruleId ===
         "DIRECT_COOKIE_ASSIGNMENT" &&
@@ -1503,10 +1465,6 @@ function analyseSourceLine({
       continue;
     }
 
-    /*
-     * Consent-state persistence is necessary
-     * for remembering the user's selection.
-     */
     if (
       shouldSuppressConsentStateOperation({
         rule,
@@ -1519,10 +1477,6 @@ function analyseSourceLine({
       continue;
     }
 
-    /*
-     * Cleanup functions remove or disable
-     * tracking state rather than creating it.
-     */
     if (
       execution.classification ===
         "cleanup-function"
@@ -1530,10 +1484,6 @@ function analyseSourceLine({
       continue;
     }
 
-    /*
-     * Suppress operations whose detected
-     * project-wide calls are all consent-gated.
-     */
     if (
       execution.classification ===
         "consent-gated"
@@ -1541,11 +1491,6 @@ function analyseSourceLine({
       continue;
     }
 
-    /*
-     * Suppress operations protected directly
-     * by a recognised condition in the same
-     * function.
-     */
     if (
       context
         .hasConsentCondition
@@ -1565,6 +1510,30 @@ function analyseSourceLine({
         cookieName,
         storageKey,
       });
+
+    /*
+     * Unresolved functions and non-top-level
+     * unguarded calls are useful static evidence,
+     * but they are not strong enough to prove an
+     * issue by themselves.
+     */
+    const reviewOnly =
+      execution.classification ===
+        "unresolved-function" ||
+      (
+        execution.classification ===
+          "unguarded-call" &&
+        !context.isTopLevel
+      );
+
+    const findingConfidence =
+      context.isTopLevel
+        ? "high"
+        : execution
+              .classification ===
+            "unguarded-call"
+          ? "medium"
+          : "low";
 
     findings.push({
       category:
@@ -1588,6 +1557,7 @@ function analyseSourceLine({
           lineNumber,
           context,
           execution,
+          reviewOnly,
         }),
 
       evidence: {
@@ -1630,6 +1600,20 @@ function analyseSourceLine({
 
         executionReason:
           execution.reason,
+
+        /*
+         * Used by the result page to distinguish
+         * actionable source evidence from evidence
+         * requiring developer review.
+         */
+        reviewOnly,
+
+        findingConfidence,
+
+        reviewReason:
+          reviewOnly
+            ? "CookieSolve detected potentially relevant source code but could not confidently prove from static analysis alone that the operation executes outside valid consent controls."
+            : "",
 
         detectedCalls:
           execution.calls.map(
@@ -1682,7 +1666,9 @@ function analyseSourceLine({
         storageKey,
 
         guidance:
-          rule.guidance,
+          reviewOnly
+            ? "Review the detected execution path manually. Runtime evidence should also be considered before treating this source pattern as a confirmed issue."
+            : rule.guidance,
       },
     });
   }
@@ -1883,11 +1869,6 @@ export async function scanSourceCode({
     }`,
   );
 
-  /*
-   * Read and parse every file before analysing
-   * individual findings. This enables cross-file
-   * function-call analysis.
-   */
   const sourceRecords = [];
 
   for (
@@ -1975,6 +1956,22 @@ export async function scanSourceCode({
       findings,
     );
 
+  const reviewFindings =
+    uniqueFindings.filter(
+      (finding) =>
+        finding.evidence
+          ?.reviewOnly ===
+        true,
+    );
+
+  const actionableFindings =
+    uniqueFindings.filter(
+      (finding) =>
+        finding.evidence
+          ?.reviewOnly !==
+        true,
+    );
+
   return {
     findings:
       uniqueFindings,
@@ -2002,11 +1999,17 @@ export async function scanSourceCode({
       findingsDetected:
         uniqueFindings.length,
 
+      actionableFindings:
+        actionableFindings.length,
+
+      reviewFindings:
+        reviewFindings.length,
+
       maximumFiles:
         MAX_FILES_PER_SCAN,
 
       analysisMethod:
-        "Pattern analysis with project-wide function-call, consent-condition and execution-context heuristics",
+        "Pattern analysis with project-wide function-call, consent-condition, execution-context and review-confidence heuristics",
     },
   };
 }
