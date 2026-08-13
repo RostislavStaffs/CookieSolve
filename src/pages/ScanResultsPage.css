@@ -373,3 +373,23 @@
     gap: 5px;
   }
 }
+.scan-status-pass-with-review {
+  color: #f2c66d;
+}
+
+.scan-review-status-message {
+  width: 100%;
+  margin: 10px 0 0;
+
+  padding: 10px 13px;
+
+  border: 1px solid rgba(242, 198, 109, 0.22);
+  border-radius: 10px;
+
+  background: rgba(242, 198, 109, 0.07);
+
+  color: #d7c28d;
+
+  font-size: 11px;
+  line-height: 1.5;
+}

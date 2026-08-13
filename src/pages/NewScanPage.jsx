@@ -7,6 +7,10 @@ import {
 } from "react";
 
 import {
+  loadRules,
+} from "../services/rulesConfig";
+
+import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
@@ -198,19 +202,22 @@ function NewScanPage() {
   ] = useState("");
 
   const [
-    selectedCookies,
-    setSelectedCookies,
-  ] = useState([
-    "session_id",
-    "csrf_token",
-  ]);
+  selectedCookies,
+  setSelectedCookies,
+] = useState(
+  () =>
+    loadRules().cookies,
+);
 
   const [
-    necessaryStorageAllowlist,
-    setNecessaryStorageAllowlist,
-  ] = useState(
-    "site_consent",
-  );
+  necessaryStorageAllowlist,
+  setNecessaryStorageAllowlist,
+] = useState(
+  () =>
+    loadRules()
+      .storage
+      .join(", "),
+);
 
   const hasRuntimeChecks =
     scanOptions.checkCookies ||
@@ -298,6 +305,21 @@ function NewScanPage() {
        */
     }
   }, []);
+  
+  useEffect(() => {
+  const savedRules =
+    loadRules();
+
+  setSelectedCookies(
+    savedRules.cookies,
+  );
+
+  setNecessaryStorageAllowlist(
+    savedRules.storage.join(
+      ", ",
+    ),
+  );
+}, []);
 
   useEffect(() => {
     if (

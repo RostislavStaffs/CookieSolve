@@ -17,8 +17,6 @@ import NetworkFindingsModal from "../components/NetworkFindingsModal";
 import SourceCodeFindingsModal from "../components/SourceCodeFindingsModal";
 import BrowserStorageFindingsModal from "../components/BrowserStorageFindingsModal";
 import FixGuidanceModal from "../components/FixGuidanceModal";
-import CorrelationFindingsModal from "../components/CorrelationFindingsModal";
-import ExportReportModal from "../components/ExportReportModal";
 
 import {
   getScan,
@@ -30,32 +28,36 @@ function buildFallbackSummary(
   findings,
 ) {
   const summary = {
-    total: findings.length,
+    total:
+      findings.length,
+
     high: 0,
     medium: 0,
     low: 0,
+
     cookies: 0,
     network: 0,
     browserStorage: 0,
     sourceCode: 0,
+
     preConsent: 0,
     postRejection: 0,
     postAcceptance: 0,
-    correlations: 0,
-    highConfidenceCorrelations: 0,
+
+    reviewOnly: 0,
+    actionable: 0,
   };
 
   for (
     const finding of findings
   ) {
     if (
-      [
-        "high",
-        "medium",
-        "low",
-      ].includes(
-        finding?.severity,
-      )
+      Object.prototype
+        .hasOwnProperty
+        .call(
+          summary,
+          finding.severity,
+        )
     ) {
       summary[
         finding.severity
@@ -63,82 +65,212 @@ function buildFallbackSummary(
     }
 
     if (
-      finding?.category ===
+      finding.category ===
       "cookie"
     ) {
       summary.cookies += 1;
     }
 
     if (
-      finding?.category ===
+      finding.category ===
       "network"
     ) {
       summary.network += 1;
     }
 
     if (
-      finding?.category ===
+      finding.category ===
       "browser-storage"
     ) {
-      summary.browserStorage += 1;
+      summary.browserStorage +=
+        1;
     }
 
     if (
-      finding?.category ===
+      finding.category ===
       "source-code"
     ) {
       summary.sourceCode += 1;
     }
 
     if (
-      finding?.phase ===
+      finding.phase ===
       "pre-consent"
     ) {
       summary.preConsent += 1;
     }
 
     if (
-      finding?.phase ===
+      finding.phase ===
       "post-rejection"
     ) {
-      summary.postRejection += 1;
+      summary.postRejection +=
+        1;
     }
 
     if (
-      finding?.phase ===
+      finding.phase ===
       "post-acceptance"
     ) {
-      summary.postAcceptance += 1;
+      summary.postAcceptance +=
+        1;
+    }
+
+    if (
+      finding.category ===
+        "source-code" &&
+      finding.evidence
+        ?.reviewOnly ===
+        true
+    ) {
+      summary.reviewOnly += 1;
+    } else {
+      summary.actionable += 1;
     }
   }
 
   return summary;
 }
 
-function getOverallStatus(
+function getScanMode(
   scan,
-  findingsSummary,
 ) {
   if (
-    scan?.status === "failed"
+    scan?.scanMode
+  ) {
+    return scan.scanMode;
+  }
+
+  const options =
+    scan?.scanOptions ?? {};
+
+  const hasRuntime =
+    options.cookies !== false ||
+    options.networkRequests !==
+      false ||
+    options.browserStorage !==
+      false;
+
+  const hasSource =
+    options.sourceCode === true;
+
+  if (
+    hasRuntime &&
+    hasSource
+  ) {
+    return "hybrid";
+  }
+
+  if (hasSource) {
+    return "source-code";
+  }
+
+  return "runtime";
+}
+
+function getOverallStatus(
+  scan,
+  findings,
+) {
+  if (
+    scan?.status ===
+    "failed"
   ) {
     return "FAILED";
   }
 
   if (
-    scan?.status === "pending" ||
-    scan?.status === "running"
+    scan?.status ===
+      "pending" ||
+    scan?.status ===
+      "running"
   ) {
     return "RUNNING";
   }
 
+  const safeFindings =
+    Array.isArray(findings)
+      ? findings
+      : [];
+
+  const runtimeFindings =
+    safeFindings.filter(
+      (finding) =>
+        finding.category !==
+        "source-code",
+    );
+
+  const sourceFindings =
+    safeFindings.filter(
+      (finding) =>
+        finding.category ===
+        "source-code",
+    );
+
+  const actionableSourceFindings =
+    sourceFindings.filter(
+      (finding) =>
+        finding.evidence
+          ?.reviewOnly !==
+        true,
+    );
+
+  const reviewOnlyFindings =
+    sourceFindings.filter(
+      (finding) =>
+        finding.evidence
+          ?.reviewOnly ===
+        true,
+    );
+
+  /*
+   * Runtime findings represent behaviour
+   * that CookieSolve actually observed.
+   */
   if (
-    (findingsSummary.high ??
-      0) > 0 ||
-    (findingsSummary.medium ??
-      0) > 0 ||
-    (findingsSummary.low ??
-      0) > 0
+    runtimeFindings.length >
+    0
+  ) {
+    return "WARNING";
+  }
+
+  /*
+   * Strong static findings still contribute
+   * to a warning even if runtime did not
+   * reproduce the issue during this scan.
+   */
+  if (
+    actionableSourceFindings
+      .length > 0
+  ) {
+    return "WARNING";
+  }
+
+  const scanMode =
+    getScanMode(scan);
+
+  /*
+   * Clean runtime evidence plus uncertain
+   * static evidence becomes a review state.
+   */
+  if (
+    scanMode === "hybrid" &&
+    reviewOnlyFindings.length >
+      0
+  ) {
+    return "PASS WITH REVIEW";
+  }
+
+  /*
+   * Source-only scans do not have runtime
+   * evidence available to support or reject
+   * uncertain static findings.
+   */
+  if (
+    scanMode ===
+      "source-code" &&
+    reviewOnlyFindings.length >
+      0
   ) {
     return "WARNING";
   }
@@ -146,80 +278,48 @@ function getOverallStatus(
   return "PASSED";
 }
 
+function getStatusClassName(
+  status,
+) {
+  return (
+    "scan-status-" +
+    String(status)
+      .toLowerCase()
+      .replace(
+        /\s+/g,
+        "-",
+      )
+  );
+}
+
 function getConsentActionLabel(
   consentAction,
 ) {
-  return consentAction ===
-    "accept"
-    ? "Accept All"
-    : "Reject All";
-}
-
-function getScanModeLabel(
-  scanMode,
-) {
-  if (
-    scanMode === "hybrid"
-  ) {
-    return "Hybrid";
-  }
-
-  if (
-    scanMode ===
-    "source-code"
-  ) {
-    return "Source Code";
-  }
-
-  return "Runtime";
-}
-
-function deriveLegacyScanMode(
-  scan,
-) {
-  if (scan?.scanMode) {
-    return scan.scanMode;
-  }
-
-  const options =
-    scan?.scanOptions ?? {};
-
-  const hasRuntimeChecks =
-    options.cookies === true ||
-    options.networkRequests ===
-      true ||
-    options.browserStorage ===
-      true;
-
-  const hasSourceCodeCheck =
-    options.sourceCode === true;
-
-  if (
-    hasRuntimeChecks &&
-    hasSourceCodeCheck
-  ) {
-    return "hybrid";
-  }
-
-  if (hasSourceCodeCheck) {
-    return "source-code";
-  }
-
-  return "runtime";
+  return (
+    consentAction ===
+      "accept"
+      ? "Accept All"
+      : "Reject All"
+  );
 }
 
 function ScanResultsPage() {
   const navigate =
     useNavigate();
 
-  const [searchParams] =
-    useSearchParams();
+  const [
+    searchParams,
+  ] = useSearchParams();
 
   const scanId =
-    searchParams.get("scan");
+    searchParams.get(
+      "scan",
+    );
 
-  const [scan, setScan] =
-    useState(null);
+  const [
+    scan,
+    setScan,
+  ] = useState(null);
 
   const [
     isLoading,
@@ -254,26 +354,6 @@ function ScanResultsPage() {
       [scan?.findings],
     );
 
-  const correlations =
-    useMemo(
-      () =>
-        Array.isArray(
-          scan?.correlations,
-        )
-          ? scan.correlations
-          : [],
-      [scan?.correlations],
-    );
-
-  const scanMode =
-    useMemo(
-      () =>
-        deriveLegacyScanMode(
-          scan,
-        ),
-      [scan],
-    );
-
   const findingsSummary =
     useMemo(() => {
       const fallbackSummary =
@@ -283,41 +363,47 @@ function ScanResultsPage() {
 
       return {
         ...fallbackSummary,
-        ...(scan?.findingsSummary ??
+
+        ...(scan
+          ?.findingsSummary ??
           {}),
-
-        correlations:
-          scan?.findingsSummary
-            ?.correlations ??
-          correlations.length,
-
-        highConfidenceCorrelations:
-          scan?.findingsSummary
-            ?.highConfidenceCorrelations ??
-          correlations.filter(
-            (correlation) =>
-              correlation
-                ?.confidence ===
-              "high",
-          ).length,
       };
     }, [
-      correlations,
       findings,
       scan?.findingsSummary,
     ]);
 
+  const reviewOnlyCount =
+    useMemo(
+      () =>
+        findings.filter(
+          (finding) =>
+            finding.category ===
+              "source-code" &&
+            finding.evidence
+              ?.reviewOnly ===
+              true,
+        ).length,
+      [findings],
+    );
+
+  const actionableCount =
+    findings.length -
+    reviewOnlyCount;
+
   const enabledResultTabs =
     useMemo(() => {
       const options =
-        scan?.scanOptions ?? {};
+        scan?.scanOptions ??
+        {};
 
       const tabs = [
         "Summary",
       ];
 
       if (
-        options.cookies === true
+        options.cookies !==
+        false
       ) {
         tabs.push(
           "Cookies",
@@ -325,8 +411,9 @@ function ScanResultsPage() {
       }
 
       if (
-        options.networkRequests ===
-        true
+        options
+          .networkRequests !==
+        false
       ) {
         tabs.push(
           "Network",
@@ -334,8 +421,9 @@ function ScanResultsPage() {
       }
 
       if (
-        options.browserStorage ===
-        true
+        options
+          .browserStorage !==
+        false
       ) {
         tabs.push(
           "Storage",
@@ -343,19 +431,11 @@ function ScanResultsPage() {
       }
 
       if (
-        options.sourceCode === true
+        options.sourceCode ===
+        true
       ) {
         tabs.push(
           "Source code",
-        );
-      }
-
-      if (
-        scanMode === "hybrid" &&
-        correlations.length > 0
-      ) {
-        tabs.push(
-          "Correlations",
         );
       }
 
@@ -369,16 +449,14 @@ function ScanResultsPage() {
 
       return tabs;
     }, [
-      correlations.length,
       findings.length,
       scan?.scanOptions,
-      scanMode,
     ]);
 
   const overallStatus =
     getOverallStatus(
       scan,
-      findingsSummary,
+      findings,
     );
 
   const isModalOpen =
@@ -386,7 +464,9 @@ function ScanResultsPage() {
 
   useEffect(() => {
     if (!scanId) {
-      setIsLoading(false);
+      setIsLoading(
+        false,
+      );
 
       setLoadError(
         "No scan ID was provided.",
@@ -421,7 +501,9 @@ function ScanResultsPage() {
           data.scan,
         );
 
-        setLoadError("");
+        setLoadError(
+          "",
+        );
       } catch (error) {
         if (
           !componentMounted
@@ -454,14 +536,18 @@ function ScanResultsPage() {
 
   const closeAllModals =
     useCallback(() => {
-      setActiveModal(null);
+      setActiveModal(
+        null,
+      );
+
       setSelectedFinding(
         null,
       );
     }, []);
 
   useEffect(() => {
-    document.body.style.overflow =
+    document.body.style
+      .overflow =
       isModalOpen
         ? "hidden"
         : "";
@@ -483,13 +569,14 @@ function ScanResultsPage() {
     );
 
     return () => {
-      document.body.style.overflow =
-        "";
+      document.body.style
+        .overflow = "";
 
-      document.removeEventListener(
-        "keydown",
-        closeWithEscape,
-      );
+      document
+        .removeEventListener(
+          "keydown",
+          closeWithEscape,
+        );
     };
   }, [
     closeAllModals,
@@ -500,11 +587,10 @@ function ScanResultsPage() {
     modalName,
   ) {
     if (
-      modalName !==
-        "Export report" &&
-      !enabledResultTabs.includes(
-        modalName,
-      )
+      !enabledResultTabs
+        .includes(
+          modalName,
+        )
     ) {
       return;
     }
@@ -531,59 +617,75 @@ function ScanResultsPage() {
   }
 
   function handleRunAgain() {
-    navigate("/new-scan", {
-      state: {
-        targetUrl:
-          scan?.targetUrl ??
-          "",
+    navigate(
+      "/new-scan",
+      {
+        state: {
+          targetUrl:
+            scan?.targetUrl ??
+            "",
 
-        consentAction:
-          scan
-            ?.consentAction ??
-          "reject",
+          consentAction:
+            scan
+              ?.consentAction ??
+            "reject",
 
-        acceptSelector:
-          scan
-            ?.acceptSelector ??
-          "#accept-all",
+          acceptSelector:
+            scan
+              ?.acceptSelector ??
+            "#accept-all",
 
-        rejectSelector:
-          scan
-            ?.rejectSelector ??
-          "#reject-all",
+          rejectSelector:
+            scan
+              ?.rejectSelector ??
+            "#reject-all",
 
-        browser:
-          scan?.browser ??
-          "chromium",
+          browser:
+            scan?.browser ??
+            "chromium",
 
-        waitTime:
-          scan?.waitTime ??
-          3000,
+          waitTime:
+            scan?.waitTime ??
+            3000,
 
-        sourceFolder:
-          scan
-            ?.sourceCodeFolder ??
-          "",
+          sourceFolder:
+            scan
+              ?.sourceCodeFolder ??
+            "./src",
 
-        necessaryCookieAllowlist:
-          scan
-            ?.necessaryCookieAllowlist ??
-          [],
+          necessaryCookieAllowlist:
+            scan
+              ?.necessaryCookieAllowlist ??
+            [],
 
-        scanOptions:
-          scan?.scanOptions ?? {
-            cookies: true,
-            networkRequests: true,
-            browserStorage: true,
-            sourceCode: false,
-          },
+          necessaryStorageAllowlist:
+            scan
+              ?.necessaryStorageAllowlist ??
+            [],
+
+          scanOptions:
+            scan
+              ?.scanOptions ?? {
+              cookies: true,
+
+              networkRequests:
+                true,
+
+              browserStorage:
+                true,
+
+              sourceCode:
+                false,
+            },
+        },
       },
-    });
+    );
   }
 
   function handleExportReport() {
-    openModal(
-      "Export report",
+    console.log(
+      "Export report for scan:",
+      scan?._id,
     );
   }
 
@@ -650,24 +752,6 @@ function ScanResultsPage() {
     );
   }
 
-  const resultTarget =
-    scanMode ===
-    "source-code"
-      ? scan
-          ?.sourceCodeFolder ||
-        "Unknown source folder"
-      : scan?.targetUrl ||
-        "Unknown target";
-
-  const canExport =
-    scan?.status ===
-      "completed" ||
-    (
-      scan?.status ===
-        "failed" &&
-      findings.length > 0
-    );
-
   return (
     <DashboardLayout
       activePage="New Scan"
@@ -684,7 +768,8 @@ function ScanResultsPage() {
           </h2>
 
           <div className="scan-result-url">
-            {resultTarget}
+            {scan?.targetUrl ||
+              "Unknown target"}
           </div>
 
           <div className="scan-overall-status">
@@ -693,74 +778,83 @@ function ScanResultsPage() {
             </span>
 
             <strong
-              className={`scan-status-${overallStatus.toLowerCase()}`}
+              className={
+                getStatusClassName(
+                  overallStatus,
+                )
+              }
             >
               {overallStatus}
             </strong>
           </div>
 
+          {overallStatus ===
+            "PASS WITH REVIEW" && (
+            <p className="scan-review-status-message">
+              Runtime testing did not observe an issue, but some source-code findings could not be confirmed automatically and should be reviewed.
+            </p>
+          )}
+
           <div className="scan-severity-summary">
             <span>
               High:{" "}
-              {findingsSummary.high ??
-                0}
+              {findingsSummary
+                .high ?? 0}
             </span>
 
             <span>
               Medium:{" "}
-              {findingsSummary.medium ??
-                0}
+              {findingsSummary
+                .medium ?? 0}
             </span>
 
             <span>
               Low:{" "}
-              {findingsSummary.low ??
-                0}
+              {findingsSummary
+                .low ?? 0}
             </span>
           </div>
 
           <div className="scan-result-details">
             <span>
-              Scan mode:{" "}
+              Consent action:{" "}
               <strong>
-                {getScanModeLabel(
-                  scanMode,
+                {getConsentActionLabel(
+                  scan
+                    ?.consentAction,
                 )}
               </strong>
             </span>
 
-            {scanMode !==
-              "source-code" && (
+            <span>
+              Findings:{" "}
+              <strong>
+                {findingsSummary
+                  .total ??
+                  findings.length}
+              </strong>
+            </span>
+
+            {reviewOnlyCount >
+              0 && (
               <span>
-                Consent action:{" "}
+                Review findings:{" "}
                 <strong>
-                  {getConsentActionLabel(
-                    scan
-                      ?.consentAction,
-                  )}
+                  {
+                    reviewOnlyCount
+                  }
                 </strong>
               </span>
             )}
 
             <span>
-              Findings:{" "}
+              Actionable findings:{" "}
               <strong>
-                {findingsSummary.total ??
-                  findings.length}
+                {
+                  actionableCount
+                }
               </strong>
             </span>
-
-            {scanMode ===
-              "hybrid" && (
-              <span>
-                Correlations:{" "}
-                <strong>
-                  {
-                    correlations.length
-                  }
-                </strong>
-              </span>
-            )}
           </div>
 
           <div className="scan-result-actions">
@@ -775,14 +869,6 @@ function ScanResultsPage() {
 
             <button
               type="button"
-              disabled={
-                !canExport
-              }
-              title={
-                canExport
-                  ? "Export this scan"
-                  : "Reports are available after a scan has completed"
-              }
               onClick={
                 handleExportReport
               }
@@ -847,7 +933,9 @@ function ScanResultsPage() {
         "Summary" && (
         <ScanSummaryModal
           scan={scan}
-          findings={findings}
+          findings={
+            findings
+          }
           findingsSummary={
             findingsSummary
           }
@@ -879,7 +967,9 @@ function ScanResultsPage() {
         "Cookies" && (
         <CookieFindingsModal
           scan={scan}
-          findings={findings}
+          findings={
+            findings
+          }
           onClose={
             closeAllModals
           }
@@ -892,7 +982,9 @@ function ScanResultsPage() {
       {activeModal ===
         "Network" && (
         <NetworkFindingsModal
-          findings={findings}
+          findings={
+            findings
+          }
           onClose={
             closeAllModals
           }
@@ -905,7 +997,9 @@ function ScanResultsPage() {
       {activeModal ===
         "Storage" && (
         <BrowserStorageFindingsModal
-          findings={findings}
+          findings={
+            findings
+          }
           onClose={
             closeAllModals
           }
@@ -919,23 +1013,9 @@ function ScanResultsPage() {
         "Source code" && (
         <SourceCodeFindingsModal
           scan={scan}
-          findings={findings}
-          onClose={
-            closeAllModals
+          findings={
+            findings
           }
-          onViewFinding={
-            openFindingGuidance
-          }
-        />
-      )}
-
-      {activeModal ===
-        "Correlations" && (
-        <CorrelationFindingsModal
-          correlations={
-            correlations
-          }
-          findings={findings}
           onClose={
             closeAllModals
           }
@@ -952,7 +1032,9 @@ function ScanResultsPage() {
           finding={
             selectedFinding
           }
-          findings={findings}
+          findings={
+            findings
+          }
           onClose={
             closeAllModals
           }
@@ -961,16 +1043,6 @@ function ScanResultsPage() {
           }
           onExportResults={
             handleExportReport
-          }
-        />
-      )}
-
-      {activeModal ===
-        "Export report" && (
-        <ExportReportModal
-          scan={scan}
-          onClose={
-            closeAllModals
           }
         />
       )}
