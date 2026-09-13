@@ -1,1 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PortfolioCMS — PortfolioCMS</title>
+  <link rel="stylesheet" href="../../shared/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">PortfolioCMS</div>
+    <nav aria-label="Main navigation">
+      <span>Product</span>
+      <span>Pricing</span>
+      <span>Contact</span>
+    </nav>
+  </header>
 
+  <main>
+    <section class="hero">
+      <small>FW012 · controlled development build</small>
+      <h1>PortfolioCMS</h1>
+      <p>A CMS prototype where an old tracking bootstrap module still starts marketing independently of the new consent manager.</p>
+    </section>
+
+    <section class="cards">
+      <article class="card">
+        <h2>Fast setup</h2>
+        <p>Configure the service and begin using the development build in minutes.</p>
+      </article>
+      <article class="card">
+        <h2>Usage insights</h2>
+        <p>Analytics are intended to help the development team understand product usage.</p>
+      </article>
+      <article class="card">
+        <h2>Privacy controls</h2>
+        <p>Visitors can accept, reject, or customise optional technologies.</p>
+      </article>
+    </section>
+
+    <section class="status-panel">
+      <h2>Development diagnostics</h2>
+      <pre id="diagnostics">Page initialised.</pre>
+    </section>
+  </main>
+
+  <div class="developer-tools">
+    <button id="reset-consent" type="button">Reset consent</button>
+  </div>
+
+  <section class="cookie-banner" id="cookie-banner" aria-label="Cookie consent">
+    <h2>Your privacy choices</h2>
+    <p>
+      We use necessary technologies to operate this site. With your permission,
+      we also use analytics and marketing technologies.
+    </p>
+    <div class="cookie-actions">
+      <button id="accept-all" type="button">Accept all</button>
+      <button id="reject-all" class="secondary" type="button">Reject all</button>
+      <button id="manage-preferences" class="muted" type="button">Manage preferences</button>
+    </div>
+  </section>
+
+  <div class="preferences-backdrop" id="preferences-backdrop" hidden>
+    <section class="preferences-modal" role="dialog" aria-modal="true">
+      <h2>Cookie preferences</h2>
+
+      <div class="preference-row">
+        <div>
+          <strong>Necessary</strong>
+          <p>Required for consent storage and essential site functionality.</p>
+        </div>
+        <input type="checkbox" checked disabled />
+      </div>
+
+      <div class="preference-row">
+        <div>
+          <strong>Analytics</strong>
+          <p>Helps the development team understand how the website is used.</p>
+        </div>
+        <input id="analytics-preference" type="checkbox" />
+      </div>
+
+      <div class="preference-row">
+        <div>
+          <strong>Marketing</strong>
+          <p>Supports campaign measurement and personalised advertising.</p>
+        </div>
+        <input id="marketing-preference" type="checkbox" />
+      </div>
+
+      <div class="preference-actions">
+        <button id="close-preferences" class="secondary" type="button">Cancel</button>
+        <button id="save-preferences" type="button">Save preferences</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
